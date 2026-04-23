@@ -1,4 +1,4 @@
-\*\*STRIDE\*\*
+\# dropX Threat Model (\*\*STRIDE\*\*)
 
 &#x09;
 
@@ -12,4 +12,32 @@
 |E|Elevation|Can a receiver use the web page to hack into your phone's system|Atomic Scoping: The server is restricted to Read-Only access. It only has permission to serve specific content:// Uris selected by the user, preventing any system-level command execution.|
 
 
+
+
+
+\## Security Implementation Pipeline
+
+
+
+\### Stage 1: Before development
+
+* Threat Modeling: Using the STRIDE framework to identify risks before writing code (Status: DONE)
+
+
+
+\### Stage 2: During development
+
+* Continuous SCA Scanning: Automated Gradle tasks that run during development to ensure no vulnerable libraries are introduced (Using OWASP Dependency-Check)
+
+
+
+\### Stage 3: After development (Pre-deployment)
+
+* SBOM (Software Bill of Materials): Generating a CycloneDX manifest to inventory all project dependencies
+
+
+
+\### Stage 4: Post-deployment
+
+* Vulnerability Tracking: Utilizing an external agent to monitor the SBOM for new CVEs (vulnerabilities) discovered after the app is released
 
