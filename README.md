@@ -26,11 +26,13 @@ To allow seamless file sharing from an Android device to any device with a web b
 
 \## Current Status
 
-\- \[x] Project Initialization
+\- \[x] Project environment initialized (API 29/36)
 
-\- \[x] API 36 (Baklava) Compatibility verified
+\- \[x] version control established with Git hardening
 
-\- \[ ] Local IP Discovery logic
+\- \[x] Security Architecture \& STRIDE Threat Framework defined
 
-\- \[ ] Ktor Server integration
+\- \[x] Security Implementation pipeline defined
+
+\- \[x] A high-level project phases (outcomes) defined
 
