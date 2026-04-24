@@ -38,3 +38,7 @@ To allow seamless file sharing from an Android device to any device with a web b
 
 \- \[x] Industry Standard Alignment (OWASP Mobile 2024) mapping done
 
+\- \[x] Added OWASP Dependency-Check plugin 
+
+\- \[x] Created project-suppressions.xml to filter Android Studio UTP and Kotlin false positives. Added initial baseline reports and suppression ledger to docs/security
+

@@ -36,7 +36,7 @@
 
 | \*\*M1\*\* | Improper Credential Usage | \*\*RAM-only Secrets:\*\* PINs and Tokens generated at runtime; never hardcoded or saved to disk. |  |
 
-| \*\*M2\*\* | Supply Chain Security | \*\*Continuous SCA:\*\* Automated dependency scanning via OWASP Dependency-Check plugin. |  |
+| \*\*M2\*\* | Supply Chain Security | \*\*Continuous SCA:\*\* Automated dependency scanning via OWASP Dependency-Check plugin. | ACTIVE |
 
 | \*\*M3\*\* | Insecure Auth/Authz | \*\*PIN-Gated Handshake:\*\* OOB PIN challenge + high-entropy ephemeral session tokens. |  |
 
@@ -72,7 +72,9 @@ Threat Modeling: Using the STRIDE framework to identify risks before writing cod
 
 \### Stage 2: During development
 
-Continuous SCA Scanning: Automated Gradle tasks that run during development to ensure no vulnerable libraries are introduced (Using OWASP Dependency-Check)
+Continuous SCA Scanning: Automated Gradle tasks that run during development to ensure no vulnerable libraries are introduced (Using OWASP Dependency-Check) 
+
+(Status: ACTIVE)
 
 
 

@@ -1,6 +1,16 @@
+import java.util.Properties
+val localProperties = Properties() //load local.properties to access secrets (like NVD API Key) without hardcoding them
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+val myNvdKey = localProperties.getProperty("nvd.api.key") ?: ""
+
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.owasp.dependencycheck)
 }
 
 android {
@@ -53,4 +63,13 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+dependencyCheck {
+    failBuildOnCVSS = 7.0f // threshold for "High" severity vulnerabilities
+    format = "HTML"
+    nvd {
+        apiKey = myNvdKey // hidden in local.properties to prevent leaking secrets to github
+    }
+    suppressionFile = "project-suppressions.xml"
 }
