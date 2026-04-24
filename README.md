@@ -36,3 +36,5 @@ To allow seamless file sharing from an Android device to any device with a web b
 
 \- \[x] A high-level project phases (outcomes) defined
 
+\- \[x] Industry Standard Alignment (OWASP Mobile 2024) mapping done
+
