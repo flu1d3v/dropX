@@ -28,25 +28,31 @@
 
 \## 2. Industry Standard Alignment (OWASP Mobile 2024)
 
-\*Use this section to map project defenses to the current mobile security standards.\*
 
 
-
-| OWASP ID | Category | dropX Mitigation | Status |
+| ID | Category | dropX Mitigation Strategy | Status |
 
 | :--- | :--- | :--- | :--- |
 
-| M2 | Inadequate Supply Chain Security | \[Your Detail Here] |  |
+| \*\*M1\*\* | Improper Credential Usage | \*\*RAM-only Secrets:\*\* PINs and Tokens generated at runtime; never hardcoded or saved to disk. |  |
 
-| M3 | Insecure Authentication/Authorization | \[Your Detail Here] |  |
+| \*\*M2\*\* | Supply Chain Security | \*\*Continuous SCA:\*\* Automated dependency scanning via OWASP Dependency-Check plugin. |  |
 
-| M5 | Insecure Communication | \[Your Detail Here] |  |
+| \*\*M3\*\* | Insecure Auth/Authz | \*\*PIN-Gated Handshake:\*\* OOB PIN challenge + high-entropy ephemeral session tokens. |  |
 
-| M6 | Inadequate Privacy Controls | \[Your Detail Here] |  |
+| \*\*M4\*\* | Validation (Input/Output) | \*\*Atomic Scoping:\*\* Mapping tokens to URIs to prevent Path Traversal/Dirty Stream attacks. |  |
 
-| M8 | Security Misconfiguration | \[Your Detail Here] |  |
+| \*\*M5\*\* | Insecure Communication | \*\*Session Binding:\*\* Local-only serving with verified receiver handshakes (HTTP context). | |
 
-| M9 | Insecure Data Storage | \[Your Detail Here] |  |
+| \*\*M6\*\* | Privacy Controls | \*\*Least Privilege:\*\* Utilizing Android 16 Photo Picker and Scoped Storage APIs. |  |
+
+| \*\*M7\*\* | Binary Protections | \*\*Code Hardening:\*\* Standard R8/ProGuard obfuscation for production builds. |  |
+
+| \*\*M8\*\* | Security Misconfiguration | \*\*Lifecycle Enforcement:\*\* Server tied to Foreground Service; directory indexing disabled. | |
+
+| \*\*M9\*\* | Insecure Data Storage | \*\*Zero-Persistence:\*\* Streaming files directly without creating local temporary copies. | |
+
+| \*\*M10\*\* | Insufficient Crypto | \*\*Integrity Hashing:\*\* Generating SHA-256 checksums for receiver-side file verification. |  |
 
 
 
