@@ -38,7 +38,17 @@ To allow seamless file sharing from an Android device to any device with a web b
 
 \- \[x] Industry Standard Alignment (OWASP Mobile 2024) mapping done
 
-\- \[x] Added OWASP Dependency-Check plugin 
+\- \[x] Added OWASP Dependency-Check plugin
 
 \- \[x] Created project-suppressions.xml to filter Android Studio UTP and Kotlin false positives. Added initial baseline reports and suppression ledger to docs/security
+
+\- \[x] Added NetworkManager to scan physical interfaces (Wi-Fi, Hotspot)
+
+\- \[x] Implemented multi-layer filtering (isUp, Loopback, Virtual, P2P)
+
+\- \[x] Created NetworkResult data class for prioritized IP reporting
+
+\- \[x] Added fallback for unknown multicast-capable adapters
+
+\- \[x] Phase 0 \& 1 are over
 
