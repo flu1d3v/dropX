@@ -8,7 +8,9 @@ import android.os.Build
 import android.os.IBinder
 import android.content.Intent
 
-
+/*
+* Foreground service responsible for handling file transfers
+* */
 class TransferService : Service() {
 
     private val CHANNEL_ID = "transfer_service"
@@ -28,6 +30,10 @@ class TransferService : Service() {
             .setOngoing(true)
             .build()
 
+        /*
+        android 14+ requires explicitly declaring the foreground service type
+        DATA_SYNC is appropriate for network-based file transfer operations
+         */
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
@@ -38,10 +44,13 @@ class TransferService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
+        // restart the service if the system kills it
         return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    // required on Android 8.0+ before posting notifications
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(

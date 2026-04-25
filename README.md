@@ -52,3 +52,9 @@ To allow seamless file sharing from an Android device to any device with a web b
 
 \- \[x] Phase 0 \& 1 are over
 
+\- \[x] implemented foreground service skeleton for Android 10-16"
+
+\- \[x] add Ktor dependencies via Version Catalog and perform OWASP dependency scan
+
+
+
