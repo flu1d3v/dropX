@@ -56,5 +56,7 @@ To allow seamless file sharing from an Android device to any device with a web b
 
 \- \[x] add Ktor dependencies via Version Catalog and perform OWASP dependency scan
 
+\- \[x] implemented a custom serviceScope using Dispatchers.IO and SupervisorJob
 
+\- \[x] integrated Ktor CIO engine into TransferService and verified connectivity
 
