@@ -31,6 +31,10 @@ ktor-server-cio = { group = "io.ktor", name = "ktor-server-cio-jvm", version.ref
 ktor-server-call-logging = { group = "io.ktor", name = "ktor-server-call-logging-jvm", version.ref = "ktor" }
 ktor-server-partial-content = { group = "io.ktor", name = "ktor-server-partial-content-jvm", version.ref = "ktor" }
 ktor-server-auto-head-response = { group = "io.ktor", name = "ktor-server-auto-head-response-jvm", version.ref = "ktor" }
+ktor-http = { group = "io.ktor", name = "ktor-http-jvm", version.ref = "ktor" }
+ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-content-negotiation-jvm", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
+ktor-server-conditional-headers = { group = "io.ktor", name = "ktor-server-conditional-headers-jvm", version.ref = "ktor" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

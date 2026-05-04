@@ -1,19 +1,13 @@
 package com.fluid.dropx
 
-
 import android.content.Intent
-import android.os.Build
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import com.fluid.dropx.core.FileRegistry
+import com.fluid.dropx.network.NetworkManager
 import com.fluid.dropx.network.TransferService
 
 
@@ -22,16 +16,29 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            Column(modifier = Modifier.statusBarsPadding().fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) { }
-            Text("dropX test")
+
         }
-        val intent= Intent(this, TransferService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
+    }
+
+    private fun startTransfer(selectedUris: List<Uri>) {
+        val networkManager = NetworkManager()
+        val networkResult = networkManager.getLocalNetworkData()
+
+        if (networkResult.hasAnyConnection()) {
+            val serverIp = networkResult.wifiIp ?: networkResult.hotspotIp ?: networkResult.unknownIp
+
+            selectedUris.forEach { uri ->
+                FileRegistry.addFile(uri, "File_${System.currentTimeMillis()}", 0L, "application/octet-stream")
+            }
+
+            val intent = Intent(this, TransferService::class.java)
             startService(intent)
+        }
+        else {
+            //
         }
     }
 }
+
 
 

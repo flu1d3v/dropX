@@ -1,4 +1,4 @@
-package com.fluid.dropx.network
+package com.fluid.dropx.model
 
 /*
 * a pure container for identified IP addresses
@@ -11,4 +11,3 @@ data class NetworkResult(
     // helper to quickly check if the phone is totally offline
     fun hasAnyConnection(): Boolean = hotspotIp != null || wifiIp != null || unknownIp != null
 }
-

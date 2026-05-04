@@ -3,6 +3,7 @@ package com.fluid.dropx.network
 import java.net.NetworkInterface
 import java.net.Inet4Address
 import android.util.Log
+import com.fluid.dropx.model.NetworkResult
 
 /*
 * manages local network discovery
