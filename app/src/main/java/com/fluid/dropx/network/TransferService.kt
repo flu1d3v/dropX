@@ -27,6 +27,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.partialcontent.PartialContent
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.utils.io.jvm.javaio.toByteReadChannel
@@ -35,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /*
@@ -91,7 +93,7 @@ class TransferService : Service() {
                 "File Transfer Service",
                 NotificationManager.IMPORTANCE_LOW
             )
-            val manager = this@TransferService.getSystemService(NotificationManager::class.java)
+            val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
     }
@@ -114,6 +116,14 @@ class TransferService : Service() {
                     } // enables serialization for request/response bodies
 
                     routing {
+                        get("/") {
+                            try {
+                                val content = assets.open("index.html").bufferedReader().use { it.readText() }
+                                call.respondText(content, ContentType.Text.Html)
+                            } catch (e: Exception) {
+                                call.respond(HttpStatusCode.InternalServerError, "Gallery Missing")
+                            }
+                        }
                         get("/api/files") {
                             val allFiles = FileRegistry.getAllMetadata()
                             // ContentNegotiation intercepts this and turns the list into JSON automatically

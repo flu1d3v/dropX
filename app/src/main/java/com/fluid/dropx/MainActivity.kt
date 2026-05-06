@@ -1,44 +1,43 @@
 package com.fluid.dropx
 
-import android.content.Intent
-import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.fluid.dropx.core.FileRegistry
-import com.fluid.dropx.network.NetworkManager
-import com.fluid.dropx.network.TransferService
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import com.fluid.dropx.core.TransferManager
 
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
+    private lateinit var transferManager: TransferManager
 
+    private val pickerLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) {uris ->
+        if (uris.isNotEmpty()) {
+            transferManager.startTransferSession(uris)
         }
     }
 
-    private fun startTransfer(selectedUris: List<Uri>) {
-        val networkManager = NetworkManager()
-        val networkResult = networkManager.getLocalNetworkData()
-
-        if (networkResult.hasAnyConnection()) {
-            val serverIp = networkResult.wifiIp ?: networkResult.hotspotIp ?: networkResult.unknownIp
-
-            selectedUris.forEach { uri ->
-                FileRegistry.addFile(uri, "File_${System.currentTimeMillis()}", 0L, "application/octet-stream")
-            }
-
-            val intent = Intent(this, TransferService::class.java)
-            startService(intent)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
         }
-        else {
-            //
+        transferManager = TransferManager(this)
+        enableEdgeToEdge()
+        setContent {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Button(onClick = { pickerLauncher.launch("*/*") }) {
+                    Text("Select Files & Start dropX")
+                }
+            }
         }
     }
 }
-
-
 

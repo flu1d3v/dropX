@@ -11,6 +11,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.owasp.dependencycheck)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -72,6 +73,7 @@ dependencies {
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.server.conditional.headers)
+    implementation(libs.slf4j.android)
 }
 
 dependencyCheck {

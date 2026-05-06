@@ -60,3 +60,13 @@ To allow seamless file sharing from an Android device to any device with a web b
 
 \- \[x] integrated Ktor CIO engine into TransferService and verified connectivity
 
+\- \[x] Refactored project into core, model, and network packages for better separation
+
+\- \[x] Implemented thread-safe FileRegistry using ConcurrentHashMap for file tracking
+
+\- \[x] Integrated Ktor plugins: ContentNegotiation, PartialContent, AutoHeadResponse, and ConditionalHeaders
+
+\- \[x] Created /api/files manifest route to provide file lists to the web client
+
+\- \[x] Implemented non-blocking file streaming using ByteReadChannel for memory efficiency
+
