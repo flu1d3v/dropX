@@ -12,6 +12,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.auth0.jwt.JWT
 import com.fluid.dropx.core.FileRegistry
+import com.fluid.dropx.core.security.CryptoManager
 import com.fluid.dropx.model.FileMetadata
 import com.fluid.dropx.model.PinRequest
 import io.ktor.http.ContentType
@@ -49,6 +50,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import javax.crypto.spec.SecretKeySpec
 
 /*
 * Foreground service responsible for handling file transfers
@@ -64,6 +66,10 @@ class TransferService : Service() {
     private var sessionPinHash: String? = null
 
     private val jwtSecret = java.util.UUID.randomUUID().toString()
+
+    private val cryptoManager = CryptoManager()
+
+    private var currentSharedKey: SecretKeySpec? = null //for now, we are going with 1 client
 
     companion object {
         var currentSessionId: String? = null
@@ -154,7 +160,9 @@ class TransferService : Service() {
                             intercept(ApplicationCallPipeline.Plugins) {
                                 val uri = call.request.uri
 
-                                if (uri.endsWith("/share/$sessionId/api/verify") || uri.endsWith("/share/$sessionId")) {
+                                if (uri.endsWith("/share/$sessionId/api/verify") ||
+                                    uri.endsWith("/share/$sessionId") ||
+                                    uri.endsWith("/share/$sessionId/api/handshake")) {
                                     return@intercept
                                 }
 
@@ -174,6 +182,17 @@ class TransferService : Service() {
                                     call.respond(HttpStatusCode.Unauthorized, "Token Expired or Invalid")
                                     finish()
                                 }
+                            }
+                            get("/api/handshake") {
+                                call.respondBytes(cryptoManager.getPublicKey())
+                            }
+                            post("/api/handshake") {
+                                val clientPublicKey = call.receive<ByteArray>()
+                                val sharedAesKey = cryptoManager.generateSharedSecret(clientPublicKey)
+
+                                currentSharedKey = sharedAesKey
+
+                                call.respond(HttpStatusCode.OK)
                             }
                             post("/api/verify") {
                                 try {
