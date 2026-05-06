@@ -11,6 +11,7 @@ composeBom = "2026.04.01"
 owasp-dependencycheck = "12.2.2"
 ktor = "3.4.3"
 slf4j = "1.7.36"
+java-jwt = "4.5.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -37,6 +38,7 @@ ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-conte
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
 ktor-server-conditional-headers = { group = "io.ktor", name = "ktor-server-conditional-headers-jvm", version.ref = "ktor" }
 slf4j-android = { group = "org.slf4j", name = "slf4j-android", version.ref = "slf4j" }
+auth0-jwt = { group = "com.auth0", name = "java-jwt", version.ref = "java-jwt" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

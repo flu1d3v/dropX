@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.server.conditional.headers)
     implementation(libs.slf4j.android)
+    implementation(libs.auth0.jwt)
 }
 
 dependencyCheck {

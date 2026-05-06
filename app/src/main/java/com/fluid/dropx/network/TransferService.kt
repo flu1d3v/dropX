@@ -10,25 +10,36 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.auth0.jwt.JWT
 import com.fluid.dropx.core.FileRegistry
+import com.fluid.dropx.model.FileMetadata
+import com.fluid.dropx.model.PinRequest
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.http.content.file
 import io.ktor.server.plugins.autohead.AutoHeadResponse
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.conditionalheaders.ConditionalHeaders
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.partialcontent.PartialContent
+import io.ktor.server.request.receive
+import io.ktor.server.request.uri
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.utils.io.jvm.javaio.toByteReadChannel
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +59,19 @@ class TransferService : Service() {
     private val CHANNEL_ID = "transfer_service"
     private val NOTIFICATION_ID = 101
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>?=null
+
+    private val charPool = ('A'..'Z') + ('0'..'9')
+    private var sessionPinHash: String? = null
+
+    private val jwtSecret = java.util.UUID.randomUUID().toString()
+
+    companion object {
+        var currentSessionId: String? = null
+            private set
+
+        var currentPin: String? = null
+            private set
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -103,6 +127,13 @@ class TransferService : Service() {
 
         serviceScope.launch {
             try {
+                val sessionId = java.util.UUID.randomUUID().toString()
+                currentSessionId = sessionId
+
+                val plainPin = (1..6).map { charPool.random() }.joinToString("")
+                currentPin = plainPin
+                sessionPinHash = hashString(plainPin)
+
                 server = embeddedServer(CIO, port = 1234, host = "0.0.0.0") {
                     install(CallLogging) // logs incoming requests
                     install(PartialContent) // enables HTTP range requests
@@ -117,47 +148,106 @@ class TransferService : Service() {
 
                     routing {
                         get("/") {
-                            try {
-                                val content = assets.open("index.html").bufferedReader().use { it.readText() }
-                                call.respondText(content, ContentType.Text.Html)
-                            } catch (e: Exception) {
-                                call.respond(HttpStatusCode.InternalServerError, "Gallery Missing")
-                            }
+                            call.respond(HttpStatusCode.NotFound)
                         }
-                        get("/api/files") {
-                            val allFiles = FileRegistry.getAllMetadata()
-                            // ContentNegotiation intercepts this and turns the list into JSON automatically
-                            call.respond(allFiles)
-                        }
-                        get("/download/{fileId}"){
-                            val id = call.parameters["fileId"] ?: return@get call.respond(
-                                HttpStatusCode.Companion.BadRequest)
-                            val uri = FileRegistry.getUri(id)
+                        route("/share/$sessionId") {
+                            intercept(ApplicationCallPipeline.Plugins) {
+                                val uri = call.request.uri
 
-                            if (uri != null) {
+                                if (uri.endsWith("/share/$sessionId/api/verify") || uri.endsWith("/share/$sessionId")) {
+                                    return@intercept
+                                }
+
+                                val authHeader = call.request.headers["Authorization"]
+                                val token = authHeader?.removePrefix("Bearer ")
+
+                                if (token == null) {
+                                    call.respond(HttpStatusCode.Unauthorized, "Access Denied")
+                                    finish()
+                                    return@intercept
+                                }
+
                                 try {
-                                    val inputStream = contentResolver.openInputStream(uri)
-                                    val descriptor = contentResolver.openAssetFileDescriptor(uri, "r")
-                                    val fileSize = descriptor?.length ?: -1L
-                                    descriptor?.close()
+                                    val verifier = JWT.require(com.auth0.jwt.algorithms.Algorithm.HMAC256(jwtSecret)).build()
+                                    verifier.verify(token)
+                                } catch (e: Exception) {
+                                    call.respond(HttpStatusCode.Unauthorized, "Token Expired or Invalid")
+                                    finish()
+                                }
+                            }
+                            post("/api/verify") {
+                                try {
+                                    val request = call.receive<PinRequest>()
+                                    val hashedInput = hashString(request.pin.uppercase())
 
-                                    if (inputStream != null) {
-                                        val channel = inputStream.toByteReadChannel() // wraps InputStream into a non-blocking, coroutine based reader
+                                    if (hashedInput == sessionPinHash) {
+                                        val token = JWT.create()
+                                            .withClaim("session", sessionId)
+                                            .sign(com.auth0.jwt.algorithms.Algorithm.HMAC256(jwtSecret))
 
-                                        call.response.header(HttpHeaders.ContentLength,fileSize.toString())
-                                        call.response.header(HttpHeaders.ContentType, ContentType.Application.OctetStream.toString())
-
-                                        call.respond(channel)
+                                        call.respond(mapOf("token" to token))
                                     } else {
-                                        call.respond(HttpStatusCode.Companion.InternalServerError, "Stream unavailable")
+                                        call.respond(HttpStatusCode.Unauthorized,"Invalid Pin")
                                     }
                                 } catch (e: Exception) {
-                                    call.respond(HttpStatusCode.Companion.InternalServerError, "Transfer Interrupted")
+                                    call.respond(HttpStatusCode.BadRequest, "Malformed Request")
                                 }
-                            } else {
-                                call.respond(HttpStatusCode.Companion.NotFound, "Invalid link")
                             }
+                            get("/api/files") {
+                                val allFiles = FileRegistry.getAllMetadata()
+                                // ContentNegotiation intercepts this and turns the list into JSON automatically
+                                call.respond(allFiles)
+                            }
+                            get("/preview/{fileId}") {
+                                val id = call.parameters["fileId"] ?: return@get call.respond(
+                                    HttpStatusCode.BadRequest)
+                                val uri = FileRegistry.getUri(id) ?: return@get call.respond(
+                                    HttpStatusCode.NotFound)
+                                try {
+                                    val byteArray = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        val size = android.util.Size(512,512)
+                                        val bitmap = contentResolver.loadThumbnail(uri,size,null)
 
+                                        val stream = java.io.ByteArrayOutputStream()
+                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, stream)
+                                        stream.toByteArray()
+                                    }
+                                    call.respondBytes(byteArray, ContentType.Image.JPEG)
+                                } catch (e: Exception) {
+//                                    serveDefaultIcon(call) -for default icon, implementation later as no idea about what image to use for this
+                                }
+
+                            }
+                            get("/download/{fileId}") {
+                                val id = call.parameters["fileId"] ?: return@get call.respond(
+                                    HttpStatusCode.BadRequest)
+
+                                val metadata = FileRegistry.getMetadata(id)
+                                val uri = FileRegistry.getUri(id)
+
+                                if (metadata != null && uri != null) {
+                                    try {
+                                        val inputStream = contentResolver.openInputStream(uri)
+
+                                        if (inputStream != null) {
+                                            val channel = inputStream.toByteReadChannel() // wraps InputStream into a non-blocking, coroutine based reader
+
+                                            call.response.header(HttpHeaders.ContentDisposition, "inline; filename=\"${metadata.name}\"")
+                                            call.response.header(HttpHeaders.ContentLength,metadata.size.toString())
+                                            call.response.header(HttpHeaders.ContentType, metadata.mimeType.toString())
+
+                                            call.respond(channel)
+                                        } else {
+                                            call.respond(HttpStatusCode.Companion.InternalServerError, "Stream unavailable")
+                                        }
+                                    } catch (e: Exception) {
+                                        call.respond(HttpStatusCode.Companion.InternalServerError, "Transfer Interrupted")
+                                    }
+                                } else {
+                                    call.respond(HttpStatusCode.Companion.NotFound, "Invalid link")
+                                }
+
+                            }
                         }
                     }
                 }
@@ -169,6 +259,20 @@ class TransferService : Service() {
         }
     }
 
+    private fun hashString(input: String): String {
+        return java.security.MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
+            .fold("") { str, it -> str + "%02x".format(it) }
+    }
+
+    private suspend fun serveDefaultIcon(call: io.ktor.server.application.ApplicationCall) {
+        try {
+            // a 'generic_file.png' in your src/main/assets folder
+            val iconBytes = assets.open("generic_file.png").readBytes()
+            call.respondBytes(iconBytes, ContentType.Image.PNG)
+        } catch (e: Exception) {
+            call.respond(HttpStatusCode.NotFound)
+        }
+    }
     private fun stopServer(){
         server?.stop(1000, 2000)
         server = null

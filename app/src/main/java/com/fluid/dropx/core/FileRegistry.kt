@@ -36,7 +36,7 @@ object FileRegistry {
     fun getUri(id: String): Uri? = uriMap[id]
 
     fun getAllMetadata(): List<FileMetadata> = metadataMap.values.toList()
-
+    fun getMetadata(id: String): FileMetadata? = metadataMap[id]
     fun clear() {
         metadataMap.clear()
         uriMap.clear()
