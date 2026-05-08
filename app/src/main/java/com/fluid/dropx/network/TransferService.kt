@@ -67,20 +67,10 @@ class TransferService : Service() {
     private val NOTIFICATION_ID = 101
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>?=null
 
-    private val charPool = ('A'..'Z') + ('0'..'9')
-    private var sessionPinHash: String? = null
-    private val cryptoManager = CryptoManager()
-
-
     companion object {
         var currentSessionId: String? = null
             private set
 
-        var currentPin: String? = null
-            private set
-
-        var currentPublicKeyFingerprint: String? = null
-            private set
     }
 
     override fun onCreate() {
@@ -142,15 +132,6 @@ class TransferService : Service() {
 
                 SessionState.initialize(sessionId)
 
-                val plainPin = (1..6).map { charPool.random() }.joinToString("")
-                currentPin = plainPin
-                sessionPinHash = hashString(plainPin)
-
-                val publicKeyBytes = cryptoManager.getPublicKey()
-                val publicKeyFingerprintBytes = sha256Bytes(publicKeyBytes)
-                currentPublicKeyFingerprint =  publicKeyFingerprintBytes.joinToString("") { "%02x".format(it) }
-
-
                 server = embeddedServer(CIO, port = 1234, host = "0.0.0.0") {
                     install(CallLogging) // logs incoming requests
                     install(PartialContent) // enables HTTP range requests
@@ -164,90 +145,10 @@ class TransferService : Service() {
                     } // enables serialization for request/response bodies
 
                     routing {
-                        get("/") {
-                            call.respond(HttpStatusCode.NotFound)
-                        }
                         route("/share/$sessionId") {
                             intercept(ApplicationCallPipeline.Plugins) {
                                 val uri = call.request.uri
-                                val clientId = call.request.headers["X-Client-ID"]
 
-                                if (uri == "/share/$sessionId" && clientId == null) {
-                                    if (!SessionState.canAcceptNewClient()) {
-                                        call.respond(HttpStatusCode.TooManyRequests, "Server Full")
-                                        return@intercept finish()
-                                    }
-                                    val newId = java.util.UUID.randomUUID().toString()
-                                    SessionState.clients[newId] = ClientSession(newId)
-                                    call.response.header("X-Client-ID", newId)
-                                    return@intercept
-                                }
-
-                                val clientSession = clientId?.let { SessionState.getClient(it) }
-                                if (clientSession == null) {
-                                    call.respond(HttpStatusCode.Unauthorized, "Invalid or Expired Session")
-                                    return@intercept finish()
-                                }
-                                clientSession.updateActivity()
-
-                                var isHandshake: Boolean = false
-                                if (uri == "/share/$sessionId/api/handshake") {
-                                    isHandshake = true
-                                }
-                                var isVerify: Boolean = false
-                                if (uri == "share/$sessionId/api/verify") {
-                                    isVerify = true
-                                }
-
-                                when (clientSession.state) {
-                                    ClientState.CREATED -> {
-                                        if (!isHandshake) {
-                                            call.respond(HttpStatusCode.Forbidden, "Handshake Required")
-                                            return@intercept finish()
-                                        }
-                                    }
-                                    ClientState.HANDSHAKE_STARTED -> {
-                                        if (!isHandshake && uri != "/share/$sessionId") {
-                                            call.respond(HttpStatusCode.Forbidden, "Complete Handshake First")
-                                            return@intercept finish()
-                                        }
-                                    }
-                                    ClientState.READY -> {
-
-                                    }
-                                    else -> {
-
-                                    }
-                                }
-                            }
-                            get("/api/handshake") {
-                                call.respondBytes(publicKeyBytes)
-                            }
-                            post("/api/handshake") {
-                                val clientPublicKey = call.receive<ByteArray>()
-                                val sharedAesKey = cryptoManager.generateSharedSecret(clientPublicKey)
-
-                                currentSharedKey = sharedAesKey
-
-                                call.respond(HttpStatusCode.OK)
-                            }
-                            post("/api/verify") {
-                                try {
-                                    val request = call.receive<PinRequest>()
-                                    val hashedInput = hashString(request.pin.uppercase())
-
-                                    if (hashedInput == sessionPinHash) {
-                                        val token = JWT.create()
-                                            .withClaim("session", sessionId)
-                                            .sign(com.auth0.jwt.algorithms.Algorithm.HMAC256(jwtSecret))
-
-                                        call.respond(mapOf("token" to token))
-                                    } else {
-                                        call.respond(HttpStatusCode.Unauthorized,"Invalid Pin")
-                                    }
-                                } catch (e: Exception) {
-                                    call.respond(HttpStatusCode.BadRequest, "Malformed Request")
-                                }
                             }
                             get("/api/files") {
                                 val allFiles = FileRegistry.getAllMetadata()
@@ -315,15 +216,7 @@ class TransferService : Service() {
         }
     }
 
-    private fun hashString(input: String): String {
-        return java.security.MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
-            .fold("") { str, it -> str + "%02x".format(it) }
-    }
 
-    fun sha256Bytes(input: ByteArray): ByteArray {
-        return MessageDigest.getInstance("SHA-256")
-            .digest(input)
-    }
 
     private suspend fun serveDefaultIcon(call: io.ktor.server.application.ApplicationCall) {
         try {
