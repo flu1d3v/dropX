@@ -13,6 +13,9 @@ import androidx.core.app.NotificationCompat
 import com.auth0.jwt.JWT
 import com.fluid.dropx.core.FileRegistry
 import com.fluid.dropx.core.security.CryptoManager
+import com.fluid.dropx.core.session.ClientSession
+import com.fluid.dropx.core.session.ClientState
+import com.fluid.dropx.core.session.SessionState
 import com.fluid.dropx.model.FileMetadata
 import com.fluid.dropx.model.PinRequest
 import io.ktor.http.ContentType
@@ -50,7 +53,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.security.MessageDigest
 import javax.crypto.spec.SecretKeySpec
+import kotlin.io.encoding.Base64
 
 /*
 * Foreground service responsible for handling file transfers
@@ -64,18 +69,17 @@ class TransferService : Service() {
 
     private val charPool = ('A'..'Z') + ('0'..'9')
     private var sessionPinHash: String? = null
-
-    private val jwtSecret = java.util.UUID.randomUUID().toString()
-
     private val cryptoManager = CryptoManager()
 
-    private var currentSharedKey: SecretKeySpec? = null //for now, we are going with 1 client
 
     companion object {
         var currentSessionId: String? = null
             private set
 
         var currentPin: String? = null
+            private set
+
+        var currentPublicKeyFingerprint: String? = null
             private set
     }
 
@@ -136,9 +140,16 @@ class TransferService : Service() {
                 val sessionId = java.util.UUID.randomUUID().toString()
                 currentSessionId = sessionId
 
+                SessionState.initialize(sessionId)
+
                 val plainPin = (1..6).map { charPool.random() }.joinToString("")
                 currentPin = plainPin
                 sessionPinHash = hashString(plainPin)
+
+                val publicKeyBytes = cryptoManager.getPublicKey()
+                val publicKeyFingerprintBytes = sha256Bytes(publicKeyBytes)
+                currentPublicKeyFingerprint =  publicKeyFingerprintBytes.joinToString("") { "%02x".format(it) }
+
 
                 server = embeddedServer(CIO, port = 1234, host = "0.0.0.0") {
                     install(CallLogging) // logs incoming requests
@@ -159,32 +170,58 @@ class TransferService : Service() {
                         route("/share/$sessionId") {
                             intercept(ApplicationCallPipeline.Plugins) {
                                 val uri = call.request.uri
+                                val clientId = call.request.headers["X-Client-ID"]
 
-                                if (uri.endsWith("/share/$sessionId/api/verify") ||
-                                    uri.endsWith("/share/$sessionId") ||
-                                    uri.endsWith("/share/$sessionId/api/handshake")) {
+                                if (uri == "/share/$sessionId" && clientId == null) {
+                                    if (!SessionState.canAcceptNewClient()) {
+                                        call.respond(HttpStatusCode.TooManyRequests, "Server Full")
+                                        return@intercept finish()
+                                    }
+                                    val newId = java.util.UUID.randomUUID().toString()
+                                    SessionState.clients[newId] = ClientSession(newId)
+                                    call.response.header("X-Client-ID", newId)
                                     return@intercept
                                 }
 
-                                val authHeader = call.request.headers["Authorization"]
-                                val token = authHeader?.removePrefix("Bearer ")
+                                val clientSession = clientId?.let { SessionState.getClient(it) }
+                                if (clientSession == null) {
+                                    call.respond(HttpStatusCode.Unauthorized, "Invalid or Expired Session")
+                                    return@intercept finish()
+                                }
+                                clientSession.updateActivity()
 
-                                if (token == null) {
-                                    call.respond(HttpStatusCode.Unauthorized, "Access Denied")
-                                    finish()
-                                    return@intercept
+                                var isHandshake: Boolean = false
+                                if (uri == "/share/$sessionId/api/handshake") {
+                                    isHandshake = true
+                                }
+                                var isVerify: Boolean = false
+                                if (uri == "share/$sessionId/api/verify") {
+                                    isVerify = true
                                 }
 
-                                try {
-                                    val verifier = JWT.require(com.auth0.jwt.algorithms.Algorithm.HMAC256(jwtSecret)).build()
-                                    verifier.verify(token)
-                                } catch (e: Exception) {
-                                    call.respond(HttpStatusCode.Unauthorized, "Token Expired or Invalid")
-                                    finish()
+                                when (clientSession.state) {
+                                    ClientState.CREATED -> {
+                                        if (!isHandshake) {
+                                            call.respond(HttpStatusCode.Forbidden, "Handshake Required")
+                                            return@intercept finish()
+                                        }
+                                    }
+                                    ClientState.HANDSHAKE_STARTED -> {
+                                        if (!isHandshake && uri != "/share/$sessionId") {
+                                            call.respond(HttpStatusCode.Forbidden, "Complete Handshake First")
+                                            return@intercept finish()
+                                        }
+                                    }
+                                    ClientState.READY -> {
+
+                                    }
+                                    else -> {
+
+                                    }
                                 }
                             }
                             get("/api/handshake") {
-                                call.respondBytes(cryptoManager.getPublicKey())
+                                call.respondBytes(publicKeyBytes)
                             }
                             post("/api/handshake") {
                                 val clientPublicKey = call.receive<ByteArray>()
@@ -283,6 +320,11 @@ class TransferService : Service() {
             .fold("") { str, it -> str + "%02x".format(it) }
     }
 
+    fun sha256Bytes(input: ByteArray): ByteArray {
+        return MessageDigest.getInstance("SHA-256")
+            .digest(input)
+    }
+
     private suspend fun serveDefaultIcon(call: io.ktor.server.application.ApplicationCall) {
         try {
             // a 'generic_file.png' in your src/main/assets folder
@@ -292,6 +334,7 @@ class TransferService : Service() {
             call.respond(HttpStatusCode.NotFound)
         }
     }
+
     private fun stopServer(){
         server?.stop(1000, 2000)
         server = null
