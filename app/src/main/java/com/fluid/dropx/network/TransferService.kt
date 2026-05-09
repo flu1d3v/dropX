@@ -14,7 +14,6 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.fluid.dropx.core.FileRegistry
 import com.fluid.dropx.core.ThumbnailManager
-import com.fluid.dropx.core.TransferSessionController
 import com.fluid.dropx.model.FileMetadata
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -60,9 +59,12 @@ class TransferService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val channelId = "transfer_service"
     private val notificationId = 101
-    private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>?=null
 
-    private val transferSessionController = TransferSessionController(this)
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var locksHeld = false
+
+    private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>?=null
     private val thumbnailManager = ThumbnailManager(this)
 
     companion object {
@@ -100,7 +102,9 @@ class TransferService : Service() {
             startForeground(notificationId, notification)
         }
 
+        acquireHardwareLocks()
         startServer()
+
 
         // restart the service if the system kills it
         return START_STICKY
@@ -197,13 +201,44 @@ class TransferService : Service() {
                     }
                 }
 
-                server?.start(wait = true)
+                server?.start(wait = false)
 
             } catch (e: Exception){
+                releaseHardwareLocks()
+                stopSelf()
             }
         }
     }
 
+
+    private fun acquireHardwareLocks() {
+        if (locksHeld) return
+
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "dropX:WakeLock").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+
+        val wm = getSystemService(Context.WIFI_SERVICE) as WifiManager
+        wifiLock = wm.createWifiLock(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            else WifiManager.WIFI_MODE_FULL,
+            "dropX:WifiLock"
+        ).apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+        locksHeld = true
+    }
+
+    private fun releaseHardwareLocks() {
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wifiLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
+        wifiLock = null
+        locksHeld = false
+    }
 
 
     private suspend fun serveDefaultIcon(call: io.ktor.server.application.ApplicationCall) {
@@ -222,6 +257,7 @@ class TransferService : Service() {
 
     override fun onDestroy() {
         stopServer()
+        releaseHardwareLocks()
         serviceScope.cancel()
         super.onDestroy()
     }
