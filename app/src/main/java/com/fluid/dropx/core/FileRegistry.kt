@@ -12,14 +12,15 @@ object FileRegistry {
     private val uriMap = ConcurrentHashMap<String, Uri>()
     private val metadataMap = ConcurrentHashMap<String, FileMetadata>()
 
-    fun addFile(uri: Uri, name: String, size: Long, mime: String): String {
+    fun addFile(uri: Uri, name: String, size: Long, mime: String, lastModified: Long): String {
         val secureId = UUID.randomUUID().toString()
 
         val metadata = FileMetadata(
             id = secureId,
             name = name,
             size = size,
-            mimeType = mime
+            mimeType = mime,
+            lastModified = lastModified
         )
 
         metadataMap[secureId]=metadata

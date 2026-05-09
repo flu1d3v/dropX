@@ -12,6 +12,7 @@ owasp-dependencycheck = "12.2.2"
 ktor = "3.4.3"
 slf4j = "1.7.36"
 java-jwt = "4.5.2"
+documentfile = "1.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -39,6 +40,7 @@ ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serializatio
 ktor-server-conditional-headers = { group = "io.ktor", name = "ktor-server-conditional-headers-jvm", version.ref = "ktor" }
 slf4j-android = { group = "org.slf4j", name = "slf4j-android", version.ref = "slf4j" }
 auth0-jwt = { group = "com.auth0", name = "java-jwt", version.ref = "java-jwt" }
+androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

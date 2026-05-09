@@ -1,23 +1,21 @@
 package com.fluid.dropx.network
 
-import android.R
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import com.auth0.jwt.JWT
 import com.fluid.dropx.core.FileRegistry
-import com.fluid.dropx.core.security.CryptoManager
-import com.fluid.dropx.core.session.ClientSession
-import com.fluid.dropx.core.session.ClientState
-import com.fluid.dropx.core.session.SessionState
+import com.fluid.dropx.core.ThumbnailManager
+import com.fluid.dropx.core.TransferSessionController
 import com.fluid.dropx.model.FileMetadata
-import com.fluid.dropx.model.PinRequest
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -42,7 +40,6 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
-import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.utils.io.jvm.javaio.toByteReadChannel
@@ -53,19 +50,20 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.security.MessageDigest
-import javax.crypto.spec.SecretKeySpec
-import kotlin.io.encoding.Base64
+
+
 
 /*
 * Foreground service responsible for handling file transfers
 * */
 class TransferService : Service() {
-
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val CHANNEL_ID = "transfer_service"
-    private val NOTIFICATION_ID = 101
+    private val channelId = "transfer_service"
+    private val notificationId = 101
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>?=null
+
+    private val transferSessionController = TransferSessionController(this)
+    private val thumbnailManager = ThumbnailManager(this)
 
     companion object {
         var currentSessionId: String? = null
@@ -78,11 +76,12 @@ class TransferService : Service() {
         createNotificationChannel()
     }
 
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification = NotificationCompat.Builder(this,CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this,channelId)
             .setContentTitle("dropX-test")
             .setContentText("dropX-test")
-            .setSmallIcon(R.drawable.stat_sys_upload)
+            .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .build()
@@ -93,12 +92,12 @@ class TransferService : Service() {
          */
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
-                NOTIFICATION_ID,
+                notificationId,
                 notification,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
         } else {
-            startForeground(NOTIFICATION_ID, notification)
+            startForeground(notificationId, notification)
         }
 
         startServer()
@@ -113,7 +112,7 @@ class TransferService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID,
+                channelId,
                 "File Transfer Service",
                 NotificationManager.IMPORTANCE_LOW
             )
@@ -130,7 +129,6 @@ class TransferService : Service() {
                 val sessionId = java.util.UUID.randomUUID().toString()
                 currentSessionId = sessionId
 
-                SessionState.initialize(sessionId)
 
                 server = embeddedServer(CIO, port = 1234, host = "0.0.0.0") {
                     install(CallLogging) // logs incoming requests
@@ -146,36 +144,26 @@ class TransferService : Service() {
 
                     routing {
                         route("/share/$sessionId") {
-                            intercept(ApplicationCallPipeline.Plugins) {
-                                val uri = call.request.uri
-
-                            }
                             get("/api/files") {
                                 val allFiles = FileRegistry.getAllMetadata()
                                 // ContentNegotiation intercepts this and turns the list into JSON automatically
                                 call.respond(allFiles)
                             }
                             get("/preview/{fileId}") {
-                                val id = call.parameters["fileId"] ?: return@get call.respond(
-                                    HttpStatusCode.BadRequest)
-                                val uri = FileRegistry.getUri(id) ?: return@get call.respond(
-                                    HttpStatusCode.NotFound)
-                                try {
-                                    val byteArray = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        val size = android.util.Size(512,512)
-                                        val bitmap = contentResolver.loadThumbnail(uri,size,null)
+                                val id = call.parameters["fileId"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                                val metadata = FileRegistry.getMetadata(id) ?: return@get call.respond(HttpStatusCode.NotFound)
+                                val uri = FileRegistry.getUri(id) ?: return@get call.respond(HttpStatusCode.NotFound)
 
-                                        val stream = java.io.ByteArrayOutputStream()
-                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, stream)
-                                        stream.toByteArray()
-                                    }
-                                    call.respondBytes(byteArray, ContentType.Image.JPEG)
-                                } catch (e: Exception) {
-//                                    serveDefaultIcon(call) -for default icon, implementation later as no idea about what image to use for this
+                                val thumbBytes = thumbnailManager.getThumbnail(metadata.name,uri, metadata.size, metadata.lastModified)
+
+                                if (thumbBytes != null) {
+                                    call.response.header(HttpHeaders.CacheControl, "public, max-age=86400")
+                                    call.respondBytes(thumbBytes, ContentType.Image.JPEG)
+                                } else {
+//                                    serveDefaultIcon(call)
                                 }
-
                             }
-                            get("/download/{fileId}") {
+                            get("/file/{fileId}") {
                                 val id = call.parameters["fileId"] ?: return@get call.respond(
                                     HttpStatusCode.BadRequest)
 
@@ -220,8 +208,7 @@ class TransferService : Service() {
 
     private suspend fun serveDefaultIcon(call: io.ktor.server.application.ApplicationCall) {
         try {
-            // a 'generic_file.png' in your src/main/assets folder
-            val iconBytes = assets.open("generic_file.png").readBytes()
+            val iconBytes = assets.open("").readBytes()
             call.respondBytes(iconBytes, ContentType.Image.PNG)
         } catch (e: Exception) {
             call.respond(HttpStatusCode.NotFound)

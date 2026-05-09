@@ -15,10 +15,13 @@ class TransferManager(private val context: Context) {
         FileRegistry.clear()
 
         selectedUris.forEach { uri ->
+
+            val doc = androidx.documentfile.provider.DocumentFile.fromSingleUri(context, uri)
+            val lastMod = doc?.lastModified() ?: 0L
             val (name, size) = FileUtil.getUriMetadata(context,uri)
             val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
 
-            FileRegistry.addFile(uri, name, size, mimeType)
+            FileRegistry.addFile(uri, name, size, mimeType, lastMod)
         }
 
         val networkResult = networkManager.getLocalNetworkData()
