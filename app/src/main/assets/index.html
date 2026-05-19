@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>dropX</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+        :root{
+          --bg:#f8f9fa;
+          --surface:#fff;
+          --surface-hover:#f1f3f4;
+          --border:#e0e0e0;
+          --border-strong:#c6c6c6;
+          --t1:#202124;
+          --t2:#5f6368;
+          --t3:#9aa0a6;
+          --blue:#1a73e8;
+          --blue-dark:#1557b0;
+          --blue-surf:#e8f0fe;
+          --red:#d93025;
+          --red-surf:#fce8e6;
+          --green:#188038;
+          --green-surf:#e6f4ea;
+          --purple:#9c27b0;
+          --pink:#e91e63;
+          --orange:#ff9800;
+          --img-green:#4caf50;
+          --slate:#607d8b;
+
+          --r:8px;
+          --r-lg:12px;
+          --r-full:9999px;
+          --shadow-sm:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+          --shadow-md:0 4px 12px rgba(0,0,0,.1),0 2px 4px rgba(0,0,0,.06);
+          --shadow-lg:0 12px 36px rgba(0,0,0,.16),0 4px 8px rgba(0,0,0,.08);
+          --transition:140ms cubic-bezier(.4,0,.2,1);
+
+          --topbar-h:64px;
+          --sidebar-w:220px;
+        }
+
+        body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;overflow-x:hidden}
+
+        /* ─── Scrollbar ─────────────────────────────────────────── */
+        ::-webkit-scrollbar{width:6px;height:6px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:var(--t3)}
+
+        /* ─── Top bar ────────────────────────────────────────────── */
+        .topbar{
+          position:fixed;top:0;left:0;right:0;z-index:100;
+          height:var(--topbar-h);
+          background:var(--surface);
+          border-bottom:1px solid var(--border);
+          display:flex;align-items:center;gap:12px;padding:0 16px;
+        }
+        .logo{
+          display:flex;align-items:center;gap:9px;
+          width:var(--sidebar-w);flex-shrink:0;text-decoration:none;color:inherit;
+        }
+        .logo-mark{
+          width:34px;height:34px;border-radius:10px;background:var(--blue);
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;
+        }
+        .logo-mark svg{width:18px;height:18px;color:#fff}
+        .logo-name{font-size:20px;font-weight:600;letter-spacing:-.3px;color:var(--t1)}
+
+        .search-wrap{flex:1;max-width:680px}
+        .search-bar{
+          display:flex;align-items:center;gap:8px;
+          background:var(--bg);border:1px solid transparent;
+          border-radius:var(--r-full);height:44px;padding:0 16px;
+          transition:background var(--transition),border-color var(--transition),box-shadow var(--transition);
+        }
+        .search-bar:focus-within{
+          background:var(--surface);border-color:var(--blue);
+          box-shadow:0 1px 6px rgba(26,115,232,.18);
+        }
+        .search-bar svg{color:var(--t3);flex-shrink:0}
+        .search-bar input{
+          border:none;background:transparent;outline:none;
+          font-family:inherit;font-size:14px;color:var(--t1);width:100%;
+        }
+        .search-bar input::placeholder{color:var(--t3)}
+
+        .topbar-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+        .icon-btn{
+          width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;
+          background:transparent;display:flex;align-items:center;justify-content:center;
+          color:var(--t2);transition:background var(--transition);flex-shrink:0;
+        }
+        .icon-btn:hover{background:var(--surface-hover)}
+        .icon-btn.active{color:var(--blue)}
+
+        .view-toggle{display:flex;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+        .vbtn{
+          width:36px;height:36px;border:none;cursor:pointer;
+          background:transparent;display:flex;align-items:center;justify-content:center;
+          color:var(--t2);transition:background var(--transition),color var(--transition);
+        }
+        .vbtn.active{background:var(--blue-surf);color:var(--blue)}
+        .vbtn:hover:not(.active){background:var(--surface-hover)}
+
+        /* ─── Layout ─────────────────────────────────────────────── */
+        .layout{display:flex;padding-top:var(--topbar-h);min-height:100vh}
+
+        /* ─── Sidebar ────────────────────────────────────────────── */
+        .sidebar{
+          width:var(--sidebar-w);flex-shrink:0;
+          position:fixed;top:var(--topbar-h);bottom:0;
+          overflow-y:auto;padding:10px 8px;
+          border-right:1px solid var(--border);background:var(--surface);
+        }
+        .sb-btn{
+          display:flex;align-items:center;gap:11px;
+          width:100%;padding:9px 12px;border:none;cursor:pointer;
+          border-radius:var(--r-full);background:transparent;
+          font-family:inherit;font-size:13px;font-weight:500;
+          color:var(--t1);text-align:left;transition:background var(--transition);
+        }
+        .sb-btn:hover{background:var(--surface-hover)}
+        .sb-btn.active{background:var(--blue-surf);color:var(--blue)}
+        .sb-btn.active svg{color:var(--blue)}
+        .sb-btn svg{color:var(--t2);flex-shrink:0}
+        .sb-sep{height:1px;background:var(--border);margin:8px 12px}
+        .sb-label{
+          font-size:11px;font-weight:600;letter-spacing:.6px;
+          text-transform:uppercase;color:var(--t3);
+          padding:10px 12px 4px;
+        }
+
+        /* ─── Main ───────────────────────────────────────────────── */
+        .main{margin-left:var(--sidebar-w);flex:1;padding:28px 28px 40px;min-width:0}
+
+        .page-hdr{margin-bottom:20px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+        .page-title{font-size:18px;font-weight:600;color:var(--t1)}
+        .page-sub{font-size:13px;color:var(--t2);margin-top:3px}
+        .page-hdr-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+
+        /* Selection toolbar */
+        .sel-bar{
+          display:none;align-items:center;gap:10px;
+          padding:10px 16px;background:var(--blue-surf);
+          border-radius:var(--r-lg);margin-bottom:16px;
+          border:1px solid rgba(26,115,232,.15);
+        }
+        .sel-bar.on{display:flex}
+        .sel-count{font-size:13px;font-weight:500;color:var(--blue)}
+        .sel-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+        /* Buttons */
+        .btn{
+          display:inline-flex;align-items:center;gap:6px;
+          padding:8px 16px;border-radius:var(--r-full);
+          border:none;cursor:pointer;font-family:inherit;
+          font-size:13px;font-weight:500;transition:var(--transition);
+          text-decoration:none;white-space:nowrap;
+        }
+        .btn-primary{background:var(--blue);color:#fff}
+        .btn-primary:hover{background:var(--blue-dark)}
+        .btn-ghost{background:transparent;color:var(--t2)}
+        .btn-ghost:hover{background:var(--surface-hover)}
+        .btn-danger{background:transparent;color:var(--red)}
+        .btn-danger:hover{background:var(--red-surf)}
+        .btn-sm{padding:6px 12px;font-size:12px}
+
+        /* ─── Grid view ──────────────────────────────────────────── */
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(192px,1fr));gap:12px}
+
+        .card{
+          background:var(--surface);border:1px solid var(--border);
+          border-radius:var(--r-lg);overflow:hidden;cursor:pointer;
+          transition:box-shadow var(--transition),border-color var(--transition),transform var(--transition);
+          position:relative;user-select:none;
+        }
+        .card:hover{box-shadow:var(--shadow-md);border-color:#bdc1c6;transform:translateY(-1px)}
+        .card.selected{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-surf),var(--shadow-sm)}
+        .card.selected:hover{transform:none}
+
+        .card-thumb{
+          height:140px;background:var(--bg);
+          display:flex;align-items:center;justify-content:center;
+          overflow:hidden;position:relative;
+        }
+        .card-thumb img{
+          width:100%;height:100%;object-fit:cover;
+          display:block;transition:transform 220ms ease;
+        }
+        .card:hover .card-thumb img{transform:scale(1.04)}
+
+        .card-icon{
+          width:52px;height:52px;border-radius:14px;
+          display:flex;align-items:center;justify-content:center;
+        }
+        .card-check{
+          position:absolute;top:8px;left:8px;
+          width:22px;height:22px;border-radius:50%;
+          background:rgba(255,255,255,.9);border:2px solid var(--border);
+          display:flex;align-items:center;justify-content:center;
+          opacity:0;transition:opacity var(--transition);
+          backdrop-filter:blur(2px);
+        }
+        .card:hover .card-check,.card.selected .card-check{opacity:1}
+        .card.selected .card-check{background:var(--blue);border-color:var(--blue);color:#fff}
+
+        .card-info{padding:10px 12px 12px}
+        .card-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;color:var(--t1)}
+        .card-meta{font-size:11px;color:var(--t3)}
+
+        /* ─── List view ──────────────────────────────────────────── */
+        .list-view{display:none}
+        .list-view.on{display:block}
+        .grid.on{display:grid}
+        .grid:not(.on){display:none}
+
+        .list-hdr{
+          display:grid;
+          grid-template-columns:24px 36px 1fr 110px 130px 64px;
+          gap:8px;align-items:center;
+          padding:7px 14px;
+          border-bottom:2px solid var(--border);
+          font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.2px;
+        }
+        .list-row{
+          display:grid;
+          grid-template-columns:24px 36px 1fr 110px 130px 64px;
+          gap:8px;align-items:center;
+          padding:8px 14px;border-radius:var(--r);cursor:pointer;
+          transition:background var(--transition);font-size:13px;
+          border:1px solid transparent;margin:2px 0;
+        }
+        .list-row:hover{background:var(--surface-hover)}
+        .list-row.selected{background:var(--blue-surf);border-color:rgba(26,115,232,.1)}
+        .list-name{display:flex;align-items:center;gap:10px;overflow:hidden}
+        .list-name span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+        .list-meta{color:var(--t2);font-size:12px}
+        .list-chk{
+          width:18px;height:18px;border-radius:50%;
+          border:2px solid var(--border);flex-shrink:0;
+          display:flex;align-items:center;justify-content:center;
+          transition:var(--transition);
+        }
+        .list-row.selected .list-chk{background:var(--blue);border-color:var(--blue);color:#fff}
+
+        /* ─── Overlay ────────────────────────────────────────────── */
+        .overlay{
+          position:fixed;inset:0;z-index:200;
+          background:rgba(0,0,0,.55);backdrop-filter:blur(6px);
+          display:none;align-items:center;justify-content:center;
+          padding:20px;
+        }
+        .overlay.on{display:flex}
+
+        .overlay-panel{
+          background:var(--surface);border-radius:16px;
+          box-shadow:var(--shadow-lg);
+          width:100%;max-width:920px;max-height:92vh;
+          display:flex;flex-direction:column;overflow:hidden;
+          animation:panelIn 200ms cubic-bezier(.34,1.3,.64,1);
+        }
+        @keyframes panelIn{from{opacity:0;transform:scale(.95) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+
+        .ov-head{
+          display:flex;align-items:center;gap:12px;
+          padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0;
+        }
+        .ov-title{
+          flex:1;font-size:14px;font-weight:500;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+        }
+        .ov-head-actions{display:flex;align-items:center;gap:8px}
+
+        .ov-body{
+          flex:1;overflow:auto;
+          display:flex;align-items:center;justify-content:center;
+          background:#1a1a1a;min-height:280px;position:relative;
+        }
+        .ov-body img{max-width:100%;max-height:64vh;object-fit:contain;display:block}
+        .ov-body video{max-width:100%;max-height:64vh;display:block;background:#000}
+        .ov-body audio{margin:48px auto;display:block;width:min(480px,88%)}
+        .ov-body iframe{width:100%;height:64vh;border:none;display:block;background:#fff}
+
+        .no-preview{
+          display:flex;flex-direction:column;align-items:center;gap:14px;
+          color:#888;padding:56px 32px;
+        }
+        .no-preview svg{width:72px;height:72px;opacity:.3}
+        .no-preview p{font-size:14px;color:#aaa}
+
+        .ov-foot{
+          padding:14px 20px;border-top:1px solid var(--border);
+          display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap;
+        }
+        .ov-meta{font-size:12px;color:var(--t2);margin-left:auto;text-align:right;line-height:1.6}
+
+        /* ─── Loading / empty ────────────────────────────────────── */
+        .spinner-wrap{padding:80px;text-align:center;color:var(--t3)}
+        .spinner{
+          width:32px;height:32px;border:3px solid var(--border);
+          border-top-color:var(--blue);border-radius:50%;
+          animation:spin 700ms linear infinite;margin:0 auto 14px;
+        }
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        .empty-state{
+          padding:80px 32px;text-align:center;color:var(--t3);
+        }
+        .empty-state svg{width:72px;height:72px;margin:0 auto 16px;display:block;opacity:.25}
+        .empty-state h3{font-size:18px;color:var(--t2);margin-bottom:6px;font-weight:500}
+        .empty-state p{font-size:14px}
+
+        /* ─── Toast ──────────────────────────────────────────────── */
+        .toast-wrap{
+          position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+          z-index:300;display:flex;flex-direction:column;gap:8px;
+          pointer-events:none;align-items:center;
+        }
+        .toast{
+          background:#323232;color:#fff;padding:11px 20px;
+          border-radius:var(--r-full);font-size:13px;
+          pointer-events:auto;white-space:nowrap;
+          animation:toastIn 220ms ease,toastOut 220ms ease 2.8s forwards;
+        }
+        @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes toastOut{to{opacity:0;transform:translateY(6px)}}
+
+        /* ─── Download progress strip ────────────────────────────── */
+        .dl-strip{
+          position:fixed;bottom:0;left:0;right:0;z-index:250;
+          background:var(--surface);border-top:1px solid var(--border);
+          display:flex;align-items:center;gap:14px;
+          padding:12px 24px;font-size:13px;
+          transform:translateY(100%);transition:transform 300ms ease;
+        }
+        .dl-strip.on{transform:translateY(0)}
+        .dl-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t1)}
+        .dl-bar{flex:1;height:4px;background:var(--border);border-radius:2px;max-width:240px}
+        .dl-fill{height:100%;background:var(--blue);border-radius:2px;transition:width 200ms}
+        .dl-pct{font-size:12px;color:var(--t2);font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
+
+        /* ─── File-type colours ──────────────────────────────────── */
+        .ti{color:var(--img-green)}
+        .tv{color:var(--pink)}
+        .ta{color:var(--purple)}
+        .tp{color:var(--red)}
+        .tz{color:var(--orange)}
+        .to{color:var(--slate)}
+
+        /* ─── Responsive ─────────────────────────────────────────── */
+        @media(max-width:768px){
+          .sidebar{display:none}
+          .main{margin-left:0;padding:16px 12px 32px}
+          .logo{width:auto}
+          .search-wrap{max-width:none}
+          .list-hdr,.list-row{grid-template-columns:24px 28px 1fr 72px}
+          .list-hdr>*:nth-child(n+5),.list-row>*:nth-child(n+5){display:none}
+          .grid{grid-template-columns:repeat(auto-fill,minmax(156px,1fr))}
+        }
+
+        /* ─── Image load fade ────────────────────────────────────── */
+        .card-thumb img{opacity:0;transition:opacity 300ms ease}
+        .card-thumb img.loaded{opacity:1}
+    </style>
+</head>
+<body>
+
+<!-- ── Top bar ──────────────────────────────────────────────────────────── -->
+<header class="topbar">
+    <a class="logo" href="#">
+        <div class="logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
+            </svg>
+        </div>
+        <span class="logo-name">dropX</span>
+    </a>
+
+    <div class="search-wrap">
+        <div class="search-bar">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" id="searchInput" placeholder="Search files…" autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+
+    <div class="topbar-right">
+        <button class="btn btn-sm btn-primary" id="dlAllBtn" onclick="downloadSelected()" style="display:none">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download selected
+        </button>
+        <div class="view-toggle">
+            <button class="vbtn active" id="gridBtn" title="Grid" onclick="setView('grid')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            </button>
+            <button class="vbtn" id="listBtn" title="List" onclick="setView('list')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1" fill="currentColor"/><circle cx="3" cy="12" r="1" fill="currentColor"/><circle cx="3" cy="18" r="1" fill="currentColor"/></svg>
+            </button>
+        </div>
+    </div>
+</header>
+
+<!-- ── Layout ─────────────────────────────────────────────────────────────── -->
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <button class="sb-btn active" onclick="setFilter('all',this)">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            All files
+        </button>
+        <div class="sb-sep"></div>
+        <div class="sb-label">Type</div>
+        <button class="sb-btn" onclick="setFilter('image',this)">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ti"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Images
+        </button>
+        <button class="sb-btn" onclick="setFilter('video',this)">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tv"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            Videos
+        </button>
+        <button class="sb-btn" onclick="setFilter('audio',this)">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ta"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            Audio
+        </button>
+        <button class="sb-btn" onclick="setFilter('pdf',this)">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tp"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            PDFs
+        </button>
+        <button class="sb-btn" onclick="setFilter('other',this)">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="to"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Other
+        </button>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-hdr">
+            <div>
+                <h1 class="page-title" id="pageTitle">All files</h1>
+                <p class="page-sub" id="pageSub">Loading…</p>
+            </div>
+        </div>
+
+        <!-- Selection bar -->
+        <div class="sel-bar" id="selBar">
+            <span class="sel-count" id="selCount">0 selected</span>
+            <div class="sel-actions">
+                <button class="btn btn-ghost btn-sm" onclick="clearSel()">Deselect all</button>
+                <button class="btn btn-primary btn-sm" onclick="downloadSelected()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download
+                </button>
+            </div>
+        </div>
+
+        <!-- Grid -->
+        <div class="grid on" id="gridView">
+            <div class="spinner-wrap" style="grid-column:1/-1"><div class="spinner"></div><p>Loading files…</p></div>
+        </div>
+
+        <!-- List -->
+        <div class="list-view" id="listView">
+            <div class="list-hdr">
+                <div></div><div></div>
+                <div>Name</div>
+                <div>Size</div>
+                <div>Modified</div>
+                <div></div>
+            </div>
+            <div id="listBody"></div>
+        </div>
+    </main>
+</div>
+
+<!-- ── Preview overlay ─────────────────────────────────────────────────────── -->
+<div class="overlay" id="overlay" onclick="ovClose(event)">
+    <div class="overlay-panel" onclick="event.stopPropagation()">
+        <div class="ov-head">
+            <button class="icon-btn" onclick="ovClose()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <span class="ov-title" id="ovTitle"></span>
+            <div class="ov-head-actions">
+                <button class="btn btn-ghost btn-sm" id="ovPrev" onclick="ovNavigate(-1)" title="Previous">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button class="btn btn-ghost btn-sm" id="ovNext" onclick="ovNavigate(1)" title="Next">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+                <button class="btn btn-primary btn-sm" id="ovDl">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download
+                </button>
+            </div>
+        </div>
+        <div class="ov-body" id="ovBody"></div>
+        <div class="ov-foot">
+            <div id="ovStreamWrap" style="display:none">
+                <button class="btn btn-ghost btn-sm" id="ovStream">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>
+                    Open in player
+                </button>
+            </div>
+            <div class="ov-meta" id="ovMeta"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Download progress strip ─────────────────────────────────────────────── -->
+<div class="dl-strip" id="dlStrip">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    <span class="dl-name" id="dlName"></span>
+    <div class="dl-bar"><div class="dl-fill" id="dlFill" style="width:0%"></div></div>
+    <span class="dl-pct" id="dlPct">0%</span>
+</div>
+
+<!-- ── Toasts ─────────────────────────────────────────────────────────────── -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+    'use strict';
+
+    // ── URL routing ──────────────────────────────────────────────────────────────
+    // Works whether this is served from /share/<session>/... or just /
+    const SESSION_BASE = (() => {
+      // The Ktor route is /share/<sessionId>
+      // The browser will be on exactly that path so we just strip a trailing slash
+      return window.location.pathname.replace(/\/$/, '');
+    })();
+
+    const API_FILES  = `${SESSION_BASE}/api/files`;
+    const previewUrl = id => `${SESSION_BASE}/preview/${id}`;
+    const fileUrl    = id => `${SESSION_BASE}/file/${id}`;
+
+    // ── State ────────────────────────────────────────────────────────────────────
+    let allFiles = [];
+    let filtered = [];
+    let selected = new Set();
+    let currentView   = 'grid';
+    let currentFilter = 'all';
+    let currentQuery  = '';
+    let ovIndex       = -1;   // index inside `filtered` currently open in overlay
+
+    // ── Bootstrap ────────────────────────────────────────────────────────────────
+    async function init() {
+      try {
+        const res = await fetch(API_FILES, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        allFiles = await res.json();
+        applyFilter();
+      } catch (e) {
+        renderError();
+      }
+    }
+
+    function renderError() {
+      document.getElementById('gridView').innerHTML = `
+        <div class="empty-state" style="grid-column:1/-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <h3>Could not reach server</h3>
+          <p>Make sure the dropX server is still running, then reload.</p>
+        </div>`;
+      document.getElementById('pageSub').textContent = '';
+    }
+
+    // ── Filter + search ──────────────────────────────────────────────────────────
+    function applyFilter() {
+      const q = currentQuery.toLowerCase();
+      filtered = allFiles.filter(f => {
+        const typeOk = currentFilter === 'all' || mimeGroup(f.mimeType) === currentFilter;
+        const searchOk = !q || f.name.toLowerCase().includes(q);
+        return typeOk && searchOk;
+      });
+
+      const titles = { all:'All files', image:'Images', video:'Videos', audio:'Audio', pdf:'PDFs', other:'Other' };
+      document.getElementById('pageTitle').textContent = titles[currentFilter] || 'Files';
+      document.getElementById('pageSub').textContent =
+        filtered.length ? `${filtered.length} item${filtered.length !== 1 ? 's' : ''}` : 'No results';
+
+      clearSel(false);
+      renderGrid();
+      renderList();
+    }
+
+    function setFilter(type, btn) {
+      currentFilter = type;
+      document.querySelectorAll('.sb-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      applyFilter();
+    }
+
+    document.getElementById('searchInput').addEventListener('input', e => {
+      currentQuery = e.target.value;
+      applyFilter();
+    });
+
+    // ── Grid render ──────────────────────────────────────────────────────────────
+    function renderGrid() {
+      const el = document.getElementById('gridView');
+      if (!filtered.length) {
+        el.innerHTML = `
+          <div class="empty-state" style="grid-column:1/-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            <h3>No files found</h3>
+            <p>Try a different filter or search term.</p>
+          </div>`;
+        return;
+      }
+
+      el.innerHTML = filtered.map((f, i) => {
+        const g = mimeGroup(f.mimeType);
+        const hasImg = g === 'image' || g === 'video';
+        const chk = selected.has(f.id);
+        return `
+        <div class="card${chk ? ' selected' : ''}" data-id="${f.id}" data-idx="${i}" onclick="cardClick(event,${i})">
+          <div class="card-check">
+            ${chk ? checkSvg() : ''}
+          </div>
+          <div class="card-thumb">
+            ${hasImg
+              ? `<img src="${previewUrl(f.id)}" alt="${esc(f.name)}" loading="lazy"
+                   onload="this.classList.add('loaded')"
+                   onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+              : ''}
+            <div class="card-icon" style="${hasImg ? 'display:none' : 'display:flex'};background:${mimeColorAlpha(f.mimeType)}">
+              ${mimeIconSvg(f.mimeType, 28)}
+            </div>
+          </div>
+          <div class="card-info">
+            <div class="card-name" title="${esc(f.name)}">${esc(f.name)}</div>
+            <div class="card-meta">${fmtSize(f.size)}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── List render ──────────────────────────────────────────────────────────────
+    function renderList() {
+      const el = document.getElementById('listBody');
+      if (!filtered.length) { el.innerHTML = ''; return; }
+
+      el.innerHTML = filtered.map((f, i) => {
+        const chk = selected.has(f.id);
+        return `
+        <div class="list-row${chk ? ' selected' : ''}" data-id="${f.id}" data-idx="${i}" onclick="cardClick(event,${i})">
+          <div class="list-chk">${chk ? checkSvg(10) : ''}</div>
+          <div>${mimeIconSvg(f.mimeType, 18)}</div>
+          <div class="list-name"><span title="${esc(f.name)}">${esc(f.name)}</span></div>
+          <div class="list-meta">${fmtSize(f.size)}</div>
+          <div class="list-meta">${fmtDate(f.lastModified)}</div>
+          <div>
+            <a href="${fileUrl(f.id)}" download="${esc(f.name)}"
+               onclick="event.stopPropagation();toast('Downloading ${esc(f.name)}')"
+               class="btn btn-ghost btn-sm" style="padding:4px 10px">
+              ${dlIconSvg(12)}
+            </a>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── Selection ────────────────────────────────────────────────────────────────
+    function cardClick(e, idx) {
+      const el = e.currentTarget;
+      const rect = el.getBoundingClientRect();
+      const inCheck = (e.clientX - rect.left < 44) && (e.clientY - rect.top < 44);
+
+      if (inCheck || selected.size > 0) {
+        toggleSel(filtered[idx].id);
+      } else {
+        openOverlay(idx);
+      }
+    }
+
+    function toggleSel(id) {
+      if (selected.has(id)) selected.delete(id); else selected.add(id);
+      updateSelUI();
+      renderGrid();
+      renderList();
+    }
+
+    function clearSel(rerender = true) {
+      selected.clear();
+      updateSelUI();
+      if (rerender) { renderGrid(); renderList(); }
+    }
+
+    function updateSelUI() {
+      const bar = document.getElementById('selBar');
+      const dlBtn = document.getElementById('dlAllBtn');
+      const count = document.getElementById('selCount');
+      const has = selected.size > 0;
+      bar.classList.toggle('on', has);
+      dlBtn.style.display = has ? '' : 'none';
+      count.textContent = `${selected.size} selected`;
+    }
+
+    // ── View toggle ──────────────────────────────────────────────────────────────
+    function setView(v) {
+      currentView = v;
+      document.getElementById('gridView').classList.toggle('on', v === 'grid');
+      document.getElementById('listView').classList.toggle('on', v === 'list');
+      document.getElementById('gridBtn').classList.toggle('active', v === 'grid');
+      document.getElementById('listBtn').classList.toggle('active', v === 'list');
+    }
+
+    // ── Overlay / Preview ────────────────────────────────────────────────────────
+    function openOverlay(idx) {
+      ovIndex = idx;
+      const f = filtered[idx];
+      if (!f) return;
+
+      document.getElementById('ovTitle').textContent = f.name;
+      document.getElementById('ovMeta').innerHTML =
+        `${fmtSize(f.size)}<br>${fmtDate(f.lastModified)}<br><span style="color:var(--t3);font-size:11px">${f.mimeType}</span>`;
+
+      // Download button
+      const dlBtn = document.getElementById('ovDl');
+      dlBtn.onclick = () => triggerDownload(f);
+
+      // Prev/next
+      document.getElementById('ovPrev').disabled = idx <= 0;
+      document.getElementById('ovPrev').style.opacity = idx <= 0 ? '.3' : '';
+      document.getElementById('ovNext').disabled = idx >= filtered.length - 1;
+      document.getElementById('ovNext').style.opacity = idx >= filtered.length - 1 ? '.3' : '';
+
+      const body = document.getElementById('ovBody');
+      const sw   = document.getElementById('ovStreamWrap');
+      const g    = mimeGroup(f.mimeType);
+
+      sw.style.display = 'none';
+      body.innerHTML   = '';
+
+      if (g === 'image') {
+        body.innerHTML = `<img src="${fileUrl(f.id)}" alt="${esc(f.name)}"
+          onerror="this.parentElement.innerHTML='${noPreviewHtml()}'">`;
+
+      } else if (g === 'video') {
+        // Native video player — Ktor's PartialContent plugin handles range requests
+        body.innerHTML = `
+          <video controls autoplay preload="metadata"
+            style="max-width:100%;max-height:64vh;background:#000">
+            <source src="${fileUrl(f.id)}" type="${f.mimeType}">
+            <p style="color:#aaa;padding:32px">Your browser cannot play this video.</p>
+          </video>`;
+        sw.style.display = '';
+        document.getElementById('ovStream').onclick = () => window.open(fileUrl(f.id), '_blank');
+
+      } else if (g === 'audio') {
+        body.innerHTML = `
+          <audio controls autoplay style="width:min(480px,88%);margin:48px auto;display:block">
+            <source src="${fileUrl(f.id)}" type="${f.mimeType}">
+            <p style="color:#aaa">Your browser cannot play this audio.</p>
+          </audio>`;
+        sw.style.display = '';
+        document.getElementById('ovStream').onclick = () => window.open(fileUrl(f.id), '_blank');
+
+      } else if (g === 'pdf') {
+        body.innerHTML = `<iframe src="${fileUrl(f.id)}#toolbar=1" title="${esc(f.name)}"></iframe>`;
+
+      } else {
+        body.innerHTML = `
+          <div class="no-preview">
+            ${mimeIconSvg(f.mimeType, 72, true)}
+            <p>No preview available for this file type</p>
+            <button class="btn btn-primary btn-sm" onclick="triggerDownload(filtered[${idx}])">
+              ${dlIconSvg(13)} Download to view
+            </button>
+          </div>`;
+      }
+
+      document.getElementById('overlay').classList.add('on');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function noPreviewHtml() {
+      return `<div class='no-preview'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5'><path d='M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z'/><polyline points='13 2 13 9 20 9'/></svg><p>Preview unavailable</p></div>`;
+    }
+
+    function ovClose(e) {
+      if (e && e.target !== document.getElementById('overlay')) return;
+      document.getElementById('overlay').classList.remove('on');
+      document.body.style.overflow = '';
+      // Pause any playing media
+      document.getElementById('ovBody').querySelectorAll('video,audio').forEach(m => { m.pause(); m.src = ''; });
+    }
+
+    function ovNavigate(dir) {
+      const next = ovIndex + dir;
+      if (next < 0 || next >= filtered.length) return;
+      // Pause current media before switching
+      document.getElementById('ovBody').querySelectorAll('video,audio').forEach(m => { m.pause(); m.src = ''; });
+      openOverlay(next);
+    }
+
+    // ── Download ─────────────────────────────────────────────────────────────────
+    async function triggerDownload(f) {
+      // Show progress strip (fetch with streams for progress tracking)
+      const strip   = document.getElementById('dlStrip');
+      const nameEl  = document.getElementById('dlName');
+      const fillEl  = document.getElementById('dlFill');
+      const pctEl   = document.getElementById('dlPct');
+
+      nameEl.textContent = f.name;
+      fillEl.style.width = '0%';
+      pctEl.textContent  = '0%';
+      strip.classList.add('on');
+
+      try {
+        const res = await fetch(fileUrl(f.id));
+        if (!res.ok) throw new Error('Fetch failed');
+
+        const total  = parseInt(res.headers.get('content-length') || '0');
+        const reader = res.body.getReader();
+        const chunks = [];
+        let received = 0;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.length;
+          if (total > 0) {
+            const pct = Math.round(received / total * 100);
+            fillEl.style.width = pct + '%';
+            pctEl.textContent  = pct + '%';
+          }
+        }
+
+        fillEl.style.width = '100%';
+        pctEl.textContent  = '100%';
+
+        const blob = new Blob(chunks);
+        const url  = URL.createObjectURL(blob);
+        const a    = Object.assign(document.createElement('a'), { href: url, download: f.name });
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast(`Downloaded ${f.name}`);
+      } catch (err) {
+        toast('Download failed — try again');
+      } finally {
+        setTimeout(() => strip.classList.remove('on'), 1200);
+      }
+    }
+
+    async function downloadSelected() {
+      const toGet = [...selected].map(id => allFiles.find(f => f.id === id)).filter(Boolean);
+      if (!toGet.length) return;
+
+      toast(`Starting ${toGet.length} download${toGet.length > 1 ? 's' : ''}…`);
+
+      // Download sequentially to avoid browser blocking multiple simultaneous saves
+      for (let i = 0; i < toGet.length; i++) {
+        if (i > 0) await new Promise(r => setTimeout(r, 600));
+        await triggerDownload(toGet[i]);
+      }
+    }
+
+    // ── Keyboard nav ─────────────────────────────────────────────────────────────
+    document.addEventListener('keydown', e => {
+      const ov = document.getElementById('overlay');
+      if (ov.classList.contains('on')) {
+        if (e.key === 'Escape') ovClose({ target: ov });
+        if (e.key === 'ArrowLeft')  ovNavigate(-1);
+        if (e.key === 'ArrowRight') ovNavigate(1);
+      }
+      // Ctrl/Cmd+A = select all visible
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !ov.classList.contains('on')) {
+        e.preventDefault();
+        filtered.forEach(f => selected.add(f.id));
+        updateSelUI(); renderGrid(); renderList();
+      }
+    });
+
+    // ── Toast ─────────────────────────────────────────────────────────────────────
+    function toast(msg) {
+      const wrap = document.getElementById('toastWrap');
+      const el   = Object.assign(document.createElement('div'), { className: 'toast', textContent: msg });
+      wrap.appendChild(el);
+      setTimeout(() => el.remove(), 3200);
+    }
+
+    // ── SVG helpers ──────────────────────────────────────────────────────────────
+    function mimeGroup(m) {
+      if (!m) return 'other';
+      if (m.startsWith('image/'))  return 'image';
+      if (m.startsWith('video/'))  return 'video';
+      if (m.startsWith('audio/'))  return 'audio';
+      if (m === 'application/pdf') return 'pdf';
+      if (m.includes('zip') || m.includes('archive')) return 'zip';
+      return 'other';
+    }
+
+    // Maps group → CSS variable name for stroke colour
+    const groupColor = { image:'--img-green', video:'--pink', audio:'--purple', pdf:'--red', zip:'--orange', other:'--slate' };
+
+    function mimeIconSvg(mime, size = 22, large = false) {
+      const g   = mimeGroup(mime);
+      const col = `var(${groupColor[g] || groupColor.other})`;
+      const s   = size;
+      const icons = {
+        image: `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
+        video: `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.8"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`,
+        audio: `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`,
+        pdf:   `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+        zip:   `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.8"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/></svg>`,
+        other: `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+      };
+      return icons[g] || icons.other;
+    }
+
+    // Semi-transparent background tint for card icon fallback
+    function mimeColorAlpha(mime) {
+      const map = { image:'rgba(76,175,80,.12)', video:'rgba(233,30,99,.12)', audio:'rgba(156,39,176,.12)', pdf:'rgba(217,48,37,.12)', zip:'rgba(255,152,0,.12)', other:'rgba(96,125,139,.12)' };
+      return map[mimeGroup(mime)] || map.other;
+    }
+
+    function checkSvg(size = 12) {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
+    }
+    function dlIconSvg(s = 14) {
+      return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+    }
+
+    // ── Format helpers ────────────────────────────────────────────────────────────
+    function fmtSize(b) {
+      if (b < 1024)        return `${b} B`;
+      if (b < 1048576)     return `${(b/1024).toFixed(1)} KB`;
+      if (b < 1073741824)  return `${(b/1048576).toFixed(1)} MB`;
+      return `${(b/1073741824).toFixed(2)} GB`;
+    }
+    function fmtDate(ts) {
+      if (!ts) return '—';
+      return new Date(ts).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+    }
+    function esc(s) {
+      return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Go ────────────────────────────────────────────────────────────────────────
+    init();
+</script>
+</body>
+</html>

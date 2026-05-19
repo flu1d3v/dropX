@@ -26,6 +26,8 @@ class ThumbnailManager(private val context: Context) {
     private val currentDiskUsage = java.util.concurrent.atomic.AtomicLong(0L)
     private val diskQuota = 50 * 1024 * 1024L
 
+    private val diskMutex = Mutex()
+
     init {
         val thumbDir = File(context.cacheDir, "thumbs")
         if (thumbDir.exists()) {
@@ -51,7 +53,7 @@ class ThumbnailManager(private val context: Context) {
 
                 if (failMarker.exists()) return@withLock null
                 if (cacheFile.exists()) {
-                    val bytes = cacheFile.readBytes()
+                    val bytes = diskMutex.withLock {  cacheFile.readBytes() }
                     memoryCache.put(hash, bytes)
                     return@withLock bytes
                 }
@@ -71,7 +73,7 @@ class ThumbnailManager(private val context: Context) {
         }
     }
 
-    private fun generateAndStore(hash: String, uri: android.net.Uri, cacheFile: File, failMarker: File): ByteArray? {
+    private suspend fun generateAndStore(hash: String, uri: android.net.Uri, cacheFile: File, failMarker: File): ByteArray? {
         return try {
             val bitmap = context.contentResolver.loadThumbnail(uri, Size(256, 256), null)
 
@@ -79,13 +81,14 @@ class ThumbnailManager(private val context: Context) {
             bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
             val bytes = outputStream.toByteArray()
 
+            diskMutex.withLock {
+                cacheFile.parentFile?.mkdirs()
+                cacheFile.writeBytes(bytes)
 
-            cacheFile.parentFile?.mkdirs()
-            cacheFile.writeBytes(bytes)
-
-            val newSize = currentDiskUsage.addAndGet(bytes.size.toLong())
-            if (newSize > diskQuota) {
-                pruneDiskCache()
+                val newSize = currentDiskUsage.addAndGet(bytes.size.toLong())
+                if (newSize > diskQuota) {
+                    pruneDiskCache()
+                }
             }
 
             memoryCache.put(hash, bytes)

@@ -1,6 +1,7 @@
 package com.fluid.dropx.core
 
 import android.net.Uri
+import android.util.Log
 import com.fluid.dropx.model.FileMetadata
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap

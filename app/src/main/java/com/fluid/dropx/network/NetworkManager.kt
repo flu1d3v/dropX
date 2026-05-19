@@ -9,12 +9,39 @@ import com.fluid.dropx.model.NetworkResult
 * manages local network discovery
 * responsible for identifying valid IPv4 addresses for hosting the ktor server
 * */
-class NetworkManager {
+object NetworkManager {
+    private const val PREFERRED_PORT = 50505
+    var activePort: Int = PREFERRED_PORT
+        private set
+    @Volatile
+    var currentResult: NetworkResult = NetworkResult()
+        private set
+
+    fun findAvailablePort(): Int {
+        activePort = try {
+            val socket = java.net.ServerSocket(PREFERRED_PORT)
+            val port = socket.localPort
+            socket.close()
+            port
+        } catch (e: Exception) {
+            val socket = java.net.ServerSocket(0)
+            val port = socket.localPort
+            socket.close()
+            port
+        }
+        return activePort
+    }
+
+    fun refreshNetworkData(): NetworkResult {
+        val result = getLocalNetworkData()
+        currentResult = result
+        return result
+    }
 
     /*
     * scans all physical network interfaces and returns a labelled result of potential ip addresses based on trust hierarchy
     * */
-    fun getLocalNetworkData(): NetworkResult {
+    private fun getLocalNetworkData(): NetworkResult {
         var hotspotIp: String? = null
         var wifiIp: String? = null
         var unknownAdapterIp: String? = null // fallback, if unknown adapter names
@@ -55,4 +82,6 @@ class NetworkManager {
         }
         return NetworkResult(hotspotIp, wifiIp, unknownAdapterIp)
     }
+
+    fun getPreferredIp(): String? = currentResult.hotspotIp ?: currentResult.wifiIp ?: currentResult.unknownIp
 }

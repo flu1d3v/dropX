@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.documentfile)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -76,6 +77,7 @@ dependencies {
     implementation(libs.ktor.server.conditional.headers)
     implementation(libs.slf4j.android)
     implementation(libs.auth0.jwt)
+    implementation(libs.zxing.core)
 }
 
 dependencyCheck {
