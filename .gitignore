@@ -1,17 +1,34 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+# Built artifacts & dependencies
+build/
+bin/
+gen/
+.gradle/
 .kotlin/
+
+# Android Studio & IntelliJ IDE specific rules
+*.iml
 .idea/
+!.idea/codeStyles/
+!.idea/scopes/
+!/gradle.xml
+
+# Specific IDE runtime metadata caches
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/caches/
+.idea/libraries/
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# Core hardware secrets configuration (CRITICAL: prevents leaking NVD API keys)
+local.properties
+
+# OS-specific hidden system files
+.DS_Store
+Thumbs.db
+
+# Device testing artifacts
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
