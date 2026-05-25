@@ -1,10 +1,10 @@
 package com.fluid.dropx.ui.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.FolderZip
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.ui.graphics.Color
@@ -19,7 +19,7 @@ fun mimeIcon(mime: String): ImageVector = when {
     mime.startsWith("audio/")                        -> Icons.Outlined.AudioFile
     mime == "application/pdf"                        -> Icons.Outlined.PictureAsPdf
     mime.contains("zip") || mime.contains("archive") -> Icons.Outlined.FolderZip
-    else                                             -> Icons.Outlined.InsertDriveFile
+    else                                             -> Icons.AutoMirrored.Outlined.InsertDriveFile
 }
 
 /**

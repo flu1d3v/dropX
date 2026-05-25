@@ -8,23 +8,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fluid.dropx.core.FileRegistry
@@ -88,13 +86,43 @@ private fun DropXApp(
 
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // ── CENTRAL OS STATE COUPLING LOOP ───────────────────────────────────────
+    val actionStart = stringResource(R.string.intent_action_start_server)
+    val actionStop  = stringResource(R.string.intent_action_stop_server)
+    val extraIp     = stringResource(R.string.intent_extra_ip)
+
     LaunchedEffect(Unit) {
+        var lastBoundIp: String? = selectedIp
+            ?: NetworkManager.currentResult.hotspotIp
+            ?: NetworkManager.currentResult.wifiIp
+            ?: NetworkManager.currentResult.unknownIp
+
         while (true) {
-            netData = NetworkManager.refreshNetworkData()
+            val freshNetData = NetworkManager.refreshNetworkData()
+            val newEffectiveIp = selectedIp
+                ?: freshNetData.hotspotIp
+                ?: freshNetData.wifiIp
+                ?: freshNetData.unknownIp
+
+            val isCurrentlyRunning = TransferService.isEngineRunning
+
+
+            if (isCurrentlyRunning && newEffectiveIp != lastBoundIp) {
+                val stopIntent = Intent(context, TransferService::class.java).apply {
+                    action = actionStop
+                }
+                context.startService(stopIntent)
+
+                transferManager.stopTransferSession()
+                lastBoundIp = newEffectiveIp
+            } else if (!isCurrentlyRunning) {
+                lastBoundIp = newEffectiveIp
+            }
+
+            netData = freshNetData
             port    = TransferService.activePort
-            running = port > 0
+            running = isCurrentlyRunning
             files   = FileRegistry.getAllMetadata()
+
             delay(2000)
         }
     }
@@ -120,33 +148,26 @@ private fun DropXApp(
                     running = running,
                     shareUrl = shareUrl,
                     selectedIp = selectedIp,
-                    effectiveIp = effectiveIp,
                     onSelectIp = { ip -> if (!running) selectedIp = if (selectedIp == ip) null else ip },
                     onStartStop = {
                         if (running) {
                             val stopIntent = Intent(context, TransferService::class.java).apply {
-                                action = "ACTION_STOP_SERVER"
+                                action = actionStop
                             }
-                            context.stopService(stopIntent)
-                            running = false
+                            context.startService(stopIntent)
+
+                            transferManager.stopTransferSession()
+                            files = FileRegistry.getAllMetadata()
                         } else {
-                            if (files.isNotEmpty() && effectiveIp != null) {
+                            if (effectiveIp != null) {
                                 val startIntent = Intent(context, TransferService::class.java).apply {
-                                    putExtra("EXTRA_IP", effectiveIp)
-                                    putExtra("EXTRA_PORT", 50505)
+                                    action = actionStart
+                                    putExtra(extraIp, effectiveIp)
                                 }
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    context.startForegroundService(startIntent)
-                                } else {
-                                    context.startService(startIntent)
-                                }
-                                running = true
-                            } else if (files.isEmpty()) {
-                                screen = Screen.Files
+                                context.startForegroundService(startIntent)
                             }
                         }
                     },
-                    onRefresh = { if (!running) netData = NetworkManager.refreshNetworkData() },
                     onShowQr = { showQr = true }
                 )
                 Screen.Files -> FilesScreen(
@@ -155,7 +176,11 @@ private fun DropXApp(
                     onPickFiles = {
                         onRequestPick { uris ->
                             if (uris.isNotEmpty()) {
-                                transferManager.startTransferSession(uris)
+                                if (running) {
+                                    transferManager.appendTransferSession(uris)
+                                } else {
+                                    transferManager.startTransferSession(uris)
+                                }
                                 files = FileRegistry.getAllMetadata()
                             }
                         }
@@ -182,8 +207,8 @@ private fun DropXBottomBar(current: Screen, onSelect: (Screen) -> Unit) {
         modifier = Modifier.border(androidx.compose.foundation.BorderStroke(1.dp, BorderHairline))
     ) {
         listOf(
-            Triple(Screen.Configure, androidx.compose.material.icons.Icons.Default.Tune, "Configure"),
-            Triple(Screen.Files, androidx.compose.material.icons.Icons.Default.Folder, "Files")
+            Triple(Screen.Configure, Icons.Default.Tune, stringResource(R.string.nav_tab_configure)),
+            Triple(Screen.Files, Icons.Default.Folder, stringResource(R.string.nav_tab_files))
         ).forEach { (screenTarget, iconVector, labelText) ->
             NavigationBarItem(
                 selected = current == screenTarget,
@@ -194,8 +219,8 @@ private fun DropXBottomBar(current: Screen, onSelect: (Screen) -> Unit) {
                     selectedIconColor = BrandCharcoal,
                     selectedTextColor = BrandCharcoal,
                     indicatorColor = BrandContainer,
-                    unselectedIconColor = TextSecondary,
-                    unselectedTextColor = TextSecondary
+                    unselectedIconColor = TextPrimary,
+                    unselectedTextColor = TextPrimary
                 )
             )
         }

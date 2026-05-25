@@ -16,13 +16,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fluid.dropx.R
 import com.fluid.dropx.core.ThumbnailManager
 import com.fluid.dropx.model.FileMetadata
-import com.fluid.dropx.ui.theme.*
 
 @Composable
 fun FilesScreen(
@@ -32,16 +33,14 @@ fun FilesScreen(
     onRemoveFile : (String) -> Unit,
 ) {
     val context = LocalContext.current
-    // Instantiated once and remembered to protect the composition scope from garbage collection thrashing
     val thumbManager = remember { ThumbnailManager(context) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundCanvas)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        // ── TOP CONTROLS HEADER ──────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -49,55 +48,72 @@ fun FilesScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Shared Files",
+                text = stringResource(R.string.files_header_title),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f)
             )
             FilledTonalButton(
                 onClick = onPickFiles,
-                enabled = !serverRunning,
+                enabled = true,
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = BrandContainer,
-                    contentColor = BrandCharcoal,
-                    disabledContainerColor = BackgroundCanvas,
-                    disabledContentColor = TextMuted
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.primary,
                 ),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                 modifier = Modifier.height(36.dp)
             ) {
                 Icon(Icons.Outlined.Add, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("Add Files", fontSize = 13.sp)
+                Text(stringResource(R.string.action_add_files), fontSize = 13.sp)
             }
         }
 
-        // ── SUB-HEADER METADATA STRIP ────────────────────────────────────────
         if (files.isNotEmpty()) {
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("${files.size} file${if (files.size != 1) "s" else ""}", fontSize = 12.sp, color = TextSecondary)
+                // Formatted string resolution with plural handling mechanics
+                val displayCountText = if (files.size == 1) {
+                    stringResource(R.string.files_count_singular)
+                } else {
+                    stringResource(R.string.files_count_plural, files.size)
+                }
+
+                Text(
+                    text = displayCountText,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 if (serverRunning) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(StatusSuccessSurf)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
                             .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
-                        Text("Live", fontSize = 11.sp, color = StatusSuccess, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = stringResource(R.string.badge_live),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
-                    Text("Stop server to remove files", fontSize = 11.sp, color = TextMuted)
+                    Text(
+                        text = stringResource(R.string.server_running_hint),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
                 }
             }
             Spacer(Modifier.height(6.dp))
         }
 
-        // ── WORKSPACE CONFIGURATION SWITCH ───────────────────────────────────
         if (files.isEmpty()) {
             EmptyFilesState(onPickFiles)
         } else {
@@ -129,27 +145,35 @@ private fun EmptyFilesState(onPick: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Box(
-            modifier = Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)).background(BrandContainer),
+            modifier = Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Outlined.FolderOpen, null, tint = BrandCharcoal, modifier = Modifier.size(36.dp))
+            Icon(Icons.Outlined.FolderOpen, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
         }
         Spacer(Modifier.height(20.dp))
-        Text("No files selected", fontSize = 17.sp, fontWeight = FontWeight.Medium, color = TextSecondary)
+        Text(
+            text = stringResource(R.string.empty_title),
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
         Spacer(Modifier.height(6.dp))
         Text(
-            text = "Add files to share them over the\nlocal network — no app install needed.",
-            fontSize = 13.sp, color = TextMuted, textAlign = TextAlign.Center, lineHeight = 19.sp
+            text = stringResource(R.string.empty_description),
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            lineHeight = 19.sp
         )
         Spacer(Modifier.height(28.dp))
         Button(
             onClick = onPick,
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = BrandCharcoal)
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
         ) {
             Icon(Icons.Outlined.Add, null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Select Files")
+            Text(stringResource(R.string.action_select_files))
         }
     }
 }

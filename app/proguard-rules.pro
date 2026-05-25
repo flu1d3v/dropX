@@ -1,21 +1,24 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ─── CORE SERIALIZATION METADATA CONTRACTS ────────────────────────────
+# Preserves the annotations, type graphs, and closures used by Kotlinx Serialization
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Stops R8 from renaming or stripping fields out of JSON data models
+-keepclassmembers class * {
+    @kotlinx.serialization.Serializable *;
+}
+-keepclassmembers class * {
+    kotlinx.serialization.KSerializer serializer(...);
+}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# ─── APP DATA MODELS ─────────────────────────────────────────────
+# Guarantees that the exact string names match what index.html expects
+-keep class com.fluid.dropx.model.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# ─── KTOR CORE LIFECYCLE ──────────────────────────────────────────────
+# Protects Ktor's dynamic engine reflection lookups from breaking
+-keep class io.ktor.** { *; }
+-keep interface io.ktor.** { *; }
+
+# Tell R8 to safely ignore missing optional dependencies inside Ktor's server layers
+-dontwarn io.ktor.**
+-dontwarn org.slf4j.**

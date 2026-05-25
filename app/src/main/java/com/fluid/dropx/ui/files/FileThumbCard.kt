@@ -1,7 +1,9 @@
 package com.fluid.dropx.ui.files
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,7 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,22 +22,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fluid.dropx.R
 import com.fluid.dropx.core.FileRegistry
 import com.fluid.dropx.core.ThumbnailManager
 import com.fluid.dropx.model.FileMetadata
 import com.fluid.dropx.ui.components.*
-import com.fluid.dropx.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * An individual asset grid card that handles asynchronous background thumbnail decoding,
- * semantic color badge rendering, and file unlinking callbacks.
- */
 @Composable
 fun FileThumbCard(
     file        : FileMetadata,
@@ -43,41 +43,55 @@ fun FileThumbCard(
     canRemove   : Boolean,
     onRemove    : () -> Unit,
 ) {
+    val context = LocalContext.current
     var bmp by remember(file.id) { mutableStateOf<Bitmap?>(null) }
     val uri = remember(file.id) { FileRegistry.getUri(file.id) }
+    val errorString = stringResource(R.string.error_unsupported_type)
 
-    // Asynchronous file decoding channel boundary
     LaunchedEffect(key1 = file.id) {
         if (uri != null) {
-            val bytes = withContext(Dispatchers.IO) {
+            val decodedBitmap = withContext(Dispatchers.IO) {
                 runCatching {
-                    thumbManager.getThumbnail(
+                    val bytes = thumbManager.getThumbnail(
                         file.name,
                         uri,
                         file.size,
                         file.lastModified
                     )
+                    if (bytes != null) {
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    } else null
                 }.getOrNull()
             }
-            if (bytes != null) {
-                bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            }
+            bmp = decodedBitmap
         }
     }
 
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = SurfacePrimary,
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderHairline),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column {
-            // ── VISUAL PREVIEW / THUMBNAIL TRACK AREA ─────────────────────────
+    SurfaceCard {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    if (uri != null) {
+                        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, file.mimeType)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+
+                        runCatching {
+                            val chooserIntent = Intent.createChooser(viewIntent, "Open file with...")
+                            context.startActivity(chooserIntent)
+                        }.onFailure {
+                            Toast.makeText(context, errorString, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(130.dp)
-                    .background(BackgroundCanvas),
+                    .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center
             ) {
                 if (bmp != null) {
@@ -88,7 +102,6 @@ fun FileThumbCard(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    // Fallback to high-contrast schematic vector iconography
                     Box(
                         modifier = Modifier
                             .size(52.dp)
@@ -105,7 +118,6 @@ fun FileThumbCard(
                     }
                 }
 
-                // CONTEXTUAL DISMISS × BUTTON
                 if (canRemove) {
                     Box(
                         modifier = Modifier
@@ -119,14 +131,13 @@ fun FileThumbCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Remove File",
+                            contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(13.dp)
                         )
                     }
                 }
 
-                // FILE TYPE LABEL BADGE
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -145,7 +156,6 @@ fun FileThumbCard(
                 }
             }
 
-            // ── ASSET INFORMATION BLOCK ───────────────────────────────────────
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                 Text(
                     text = file.name,
@@ -153,12 +163,12 @@ fun FileThumbCard(
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = formatBytes(file.size),
                     fontSize = 11.sp,
-                    color = TextMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

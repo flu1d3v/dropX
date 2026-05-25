@@ -31,12 +31,12 @@ class ThumbnailManager(private val context: Context) {
     init {
         val thumbDir = File(context.cacheDir, "thumbs")
         if (thumbDir.exists()) {
-            currentDiskUsage.set(thumbDir.listFiles()?.sumOf { it.length() } ?: 0L)
+            currentDiskUsage.set(thumbDir.listFiles()?.filter { it.name.endsWith(".thumb") }?.sumOf { it.length() } ?: 0L)
         }
     }
 
     suspend fun getThumbnail(name: String, uri: android.net.Uri, size: Long, lastModified: Long): ByteArray? {
-        val hash = CacheKeyGenerator.generate(name,size,lastModified)
+        val hash = CacheKeyGenerator.generate(name, size, lastModified)
 
         memoryCache.get(hash)?.let { return it }
 
@@ -49,17 +49,15 @@ class ThumbnailManager(private val context: Context) {
                 memoryCache.get(hash)?.let { return@withLock it }
 
                 val cacheFile = File(context.cacheDir, "thumbs/$hash.thumb")
-                val failMarker = File(context.cacheDir, "thumbs/$hash.failed")
 
-                if (failMarker.exists()) return@withLock null
                 if (cacheFile.exists()) {
-                    val bytes = diskMutex.withLock {  cacheFile.readBytes() }
+                    val bytes = diskMutex.withLock { cacheFile.readBytes() }
                     memoryCache.put(hash, bytes)
                     return@withLock bytes
                 }
 
                 globalGenLimit.withPermit {
-                    generateAndStore(hash, uri, cacheFile, failMarker)
+                    generateAndStore(hash, uri, cacheFile)
                 }
             }
         } finally {
@@ -73,7 +71,7 @@ class ThumbnailManager(private val context: Context) {
         }
     }
 
-    private suspend fun generateAndStore(hash: String, uri: android.net.Uri, cacheFile: File, failMarker: File): ByteArray? {
+    private suspend fun generateAndStore(hash: String, uri: android.net.Uri, cacheFile: File): ByteArray? {
         return try {
             val bitmap = context.contentResolver.loadThumbnail(uri, Size(256, 256), null)
 
@@ -94,15 +92,13 @@ class ThumbnailManager(private val context: Context) {
             memoryCache.put(hash, bytes)
             bytes
         } catch (e: Exception) {
-            failMarker.parentFile?.mkdirs()
-            failMarker.createNewFile()
             null
         }
     }
 
     private fun pruneDiskCache() {
         val thumbDir = File(context.cacheDir, "thumbs")
-        val files = thumbDir.listFiles()?.sortedBy { it.lastModified() } ?: return
+        val files = thumbDir.listFiles()?.filter { it.name.endsWith(".thumb") }?.sortedBy { it.lastModified() } ?: return
 
         val targetSize = (diskQuota * 0.8).toLong()
         var deletedBytes = 0L

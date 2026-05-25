@@ -4,23 +4,24 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 
-/*
-* queries Android's ContentResolver to retrieve metadata (display name and size)
-* for the given Uri.
-*/
 object FileUtil {
     fun getUriMetadata(context: Context, uri: Uri) : Pair<String, Long> {
         var name = "unknown_file"
         var size = 0L
 
-        context.contentResolver.query(uri,null,null,null,null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-            if (cursor.moveToFirst()) {
-                name = cursor.getString(nameIndex) ?: "unknown"
-                size = cursor.getLong(sizeIndex)
+        runCatching {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)
+                    val sizeIndex = cursor.getColumnIndexOrThrow(OpenableColumns.SIZE)
+
+                    name = cursor.getString(nameIndex) ?: "unknown"
+                    size = cursor.getLong(sizeIndex)
+                }
             }
+        }.onFailure {
         }
+
         return Pair(name, size)
     }
 }
