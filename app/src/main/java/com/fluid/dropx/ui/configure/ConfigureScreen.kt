@@ -64,6 +64,9 @@ fun ConfigureScreen(
     onShowQr   : () -> Unit,
 ) {
     val context = LocalContext.current
+
+    // Dim out input configuration cards to 40% opacity when server is actively running
+    // to visually tell the user they can't change network bindings mid-stream.
     val paramsAlpha by animateFloatAsState(
         targetValue = if (running) 0.4f else 1.0f,
         animationSpec = tween(300),
@@ -78,6 +81,7 @@ fun ConfigureScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp)
     ) {
+        // App Header Toolbar Row Area
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -110,6 +114,7 @@ fun ConfigureScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
 
+            // Transient active alert sub-banner
             if (running) {
                 Row(
                     modifier = Modifier
@@ -128,6 +133,7 @@ fun ConfigureScreen(
                 }
             }
 
+            // Card 1: Network Adapter Selection Grid Container
             SurfaceCard(modifier = Modifier.alpha(paramsAlpha)) {
                 Column {
                     Row(
@@ -148,6 +154,8 @@ fun ConfigureScreen(
                         stringResource(R.string.network_label_wifi)    to netData.wifiIp,
                         stringResource(R.string.network_label_other)   to netData.unknownIp,
                     )
+
+                    // Fallback structural selection order: Use Hotspot first if alive, otherwise default to Wi-Fi LAN
                     val autoIp = netData.hotspotIp ?: netData.wifiIp ?: netData.unknownIp
 
                     rows.forEachIndexed { idx, (label, ip) ->
@@ -162,10 +170,11 @@ fun ConfigureScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
+                                    // Block click interaction changes completely if the server engine is active
                                     if (available && !running)
                                         Modifier.clickable(
                                             interactionSource = remember { MutableInteractionSource() },
-                                            indication = null
+                                            indication = null // Disables default gray touch ripple effect to prevent card layout clipping
                                         ) { onSelectIp(ip) }
                                     else Modifier
                                 )
@@ -186,6 +195,7 @@ fun ConfigureScreen(
                                 color = if (chosen) MaterialTheme.colorScheme.primary else if (available) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                                 modifier = Modifier.weight(2f)
                             )
+                            // Custom Radio Style Marker Button Wrapper
                             Box(modifier = Modifier.width(44.dp).wrapContentWidth(Alignment.End)) {
                                 Box(
                                     modifier = Modifier
@@ -210,7 +220,7 @@ fun ConfigureScreen(
                 }
             }
 
-
+            // Card 2: Active Port monitor label card
             SurfaceCard(modifier = Modifier.alpha(paramsAlpha)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
@@ -230,7 +240,7 @@ fun ConfigureScreen(
                 }
             }
 
-
+            // Card 3: Dynamic share utility access panel. Only shows up when server socket pipeline initializes.
             if (running && shareUrl != null) {
                 SurfaceCard {
                     Column(
@@ -259,7 +269,7 @@ fun ConfigureScreen(
                 }
             }
 
-
+            // Master Execution Button: Switches system color themes between Action (Primary) and Danger (Error/Red) states
             val btnColor by animateColorAsState(
                 targetValue = if (running) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 animationSpec = tween(300),
@@ -271,6 +281,7 @@ fun ConfigureScreen(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = btnColor)
             ) {
+                // Crossfades internal icons and text labels cleanly to prevent layout jerking
                 AnimatedContent(
                     targetState = running,
                     transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(160)) },
@@ -291,7 +302,7 @@ fun ConfigureScreen(
                 }
             }
 
-
+            // Bottom Footer Subtext Connection status anchor row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -315,8 +326,10 @@ fun ConfigureScreen(
     }
 }
 
+// Full popup dialog box layer to host the generated share QR code image element
 @Composable
 fun QrDialog(url: String, onDismiss: () -> Unit) {
+    // Re-generates bitmap cache matrix exclusively if the routing endpoint string argument changes
     val qr: Bitmap? = remember(url) { QRGenerator.generate(url, 512) }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {

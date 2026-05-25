@@ -5,7 +5,10 @@ import com.fluid.dropx.model.FileMetadata
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
+// In-memory registry to map selected files to randomly generated UUIDs.
+// This completely hides real file paths/URIs from the network. The client only sees the random ID.
 object FileRegistry {
+    // ConcurrentHashMaps ensure thread safety when multiple clients request metadata or stream files simultaneously
     private val uriMap = ConcurrentHashMap<String, Uri>()
     private val metadataMap = ConcurrentHashMap<String, FileMetadata>()
 
@@ -33,6 +36,7 @@ object FileRegistry {
 
     fun getUri(id: String): Uri? = uriMap[id]
 
+    // Using synchronized wrapper here to prevent ConcurrentModificationException when converting the map values to a flat list
     fun getAllMetadata(): List<FileMetadata> {
         synchronized(metadataMap) {
             return metadataMap.values.toList()

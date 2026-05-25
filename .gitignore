@@ -1,34 +1,43 @@
-# Built artifacts & dependencies
+# ─── Core Build Artifacts & Compiler Pipelines ────────────────
+**/build/
 build/
 bin/
 gen/
-.gradle/
-.kotlin/
 
-# Android Studio & IntelliJ IDE specific rules
+# Blocks internal local Kotlin build script tracker folders
+.kotlin/
+**/.kotlin/
+.gradle/
+
+# ─── IDE Configurations & Metadata Tracks ─────────────────────
 *.iml
 .idea/
 !.idea/codeStyles/
 !.idea/scopes/
 !/gradle.xml
 
-# Specific IDE runtime metadata caches
+# Explicit blocks for transient Android Studio UI cache tracking
 .idea/workspace.xml
 .idea/tasks.xml
 .idea/caches/
 .idea/libraries/
 .idea/navEditor.xml
 .idea/assetWizardSettings.xml
+.idea/inspectionProfiles/
 
-# Core hardware secrets configuration (CRITICAL: prevents leaking NVD API keys)
+# ─── Environment Secrets Isolation (CRITICAL) ─────────────────
+# Keeps your custom NVD API key hidden locally on your computer
 local.properties
 
-# OS-specific hidden system files
+# ─── System & OS Noise Filters ────────────────────────────────
 .DS_Store
 Thumbs.db
+*.bak
+*.log
 
-# Device testing artifacts
+# ─── Device Logs & Native Compilations ────────────────────────
 captures/
 .externalNativeBuild/
 .cxx/
 *.apk
+*.ap_

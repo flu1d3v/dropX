@@ -33,7 +33,6 @@ import com.fluid.dropx.core.FileRegistry
 import com.fluid.dropx.core.ThumbnailManager
 import com.fluid.dropx.model.FileMetadata
 import com.fluid.dropx.ui.components.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -48,9 +47,11 @@ fun FileThumbCard(
     val uri = remember(file.id) { FileRegistry.getUri(file.id) }
     val errorString = stringResource(R.string.error_unsupported_type)
 
+    // Side Effect: Triggered automatically whenever the card mounts or the target file.id changes.
     LaunchedEffect(key1 = file.id) {
         if (uri != null) {
-            val decodedBitmap = withContext(Dispatchers.IO) {
+            // Dispatches to the IO thread pool so processing binary bitmap arrays doesn't drop UI frame rates
+            val decodedBitmap = withContext(kotlinx.coroutines.Dispatchers.IO) {
                 runCatching {
                     val bytes = thumbManager.getThumbnail(
                         file.name,
@@ -63,7 +64,7 @@ fun FileThumbCard(
                     } else null
                 }.getOrNull()
             }
-            bmp = decodedBitmap
+            bmp = decodedBitmap // Pushes the bitmap back to the main thread to force layout refresh
         }
     }
 
@@ -73,8 +74,10 @@ fun FileThumbCard(
                 .fillMaxWidth()
                 .clickable {
                     if (uri != null) {
+                        // Broadcast Intent: Invokes the native Android system file viewer matching the target MIME type
                         val viewIntent = Intent(Intent.ACTION_VIEW).apply {
                             setDataAndType(uri, file.mimeType)
+                            // Crucial flag: grants temporary workspace access rights to the external viewing app
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
 
@@ -87,6 +90,7 @@ fun FileThumbCard(
                     }
                 }
         ) {
+            // Top Preview Container Box Area
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -95,6 +99,7 @@ fun FileThumbCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (bmp != null) {
+                    // Render image thumbnail if the bitmap decoder extraction succeeded
                     Image(
                         bitmap = bmp!!.asImageBitmap(),
                         contentDescription = file.name,
@@ -102,6 +107,7 @@ fun FileThumbCard(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
+                    // Fallback state placeholder: Displays an explicit colored vector asset block matching the MIME class
                     Box(
                         modifier = Modifier
                             .size(52.dp)
@@ -118,6 +124,7 @@ fun FileThumbCard(
                     }
                 }
 
+                // Delete Floating Action Layer: hidden automatically if the server engine is active
                 if (canRemove) {
                     Box(
                         modifier = Modifier
@@ -138,6 +145,7 @@ fun FileThumbCard(
                     }
                 }
 
+                // Bottom Left Raw Type Badge Flag (e.g., "IMAGE", "VIDEO", "PDF")
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -156,13 +164,14 @@ fun FileThumbCard(
                 }
             }
 
+            // Bottom Description metadata text labels
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                 Text(
                     text = file.name,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Ellipsis, // Clips text overflow with cleanly trailing trailing dots
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(

@@ -33,6 +33,7 @@ fun FilesScreen(
     onRemoveFile : (String) -> Unit,
 ) {
     val context = LocalContext.current
+    // Remembers the instance across view recompositions so we don't dump and recreate the thumbnail caches
     val thumbManager = remember { ThumbnailManager(context) }
 
     Column(
@@ -41,6 +42,7 @@ fun FilesScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
+        // App Header Toolbar Row Area
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -71,6 +73,7 @@ fun FilesScreen(
             }
         }
 
+        // Sub-Header Count Banner Row (Appears exclusively when files are in the selection array)
         if (files.isNotEmpty()) {
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
@@ -90,6 +93,7 @@ fun FilesScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                // Live Stream Safety Badge Alert: Tells the user they cannot modify items while the server is hosting
                 if (serverRunning) {
                     Box(
                         modifier = Modifier
@@ -114,20 +118,25 @@ fun FilesScreen(
             Spacer(Modifier.height(6.dp))
         }
 
+        // Layout Routing State Switch
         if (files.isEmpty()) {
             EmptyFilesState(onPickFiles)
         } else {
+            // Lazy Grid Layer: Recycles cell allocations on the fly to save memory layout allocation weight
             LazyVerticalGrid(
-                columns = GridCells.Fixed(count = 2),
+                columns = GridCells.Fixed(count = 2), // Splits row real-estate down the middle into two uniform column boxes
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(space = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(space = 10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
+                // Key property is explicitly set to it.id so Compose tracks elements by unique ID.
+                // This ensures list structural updates (reordering/removals) render smoothly without breaking list tracking animation paths.
                 items(files, key = { it.id }) { file ->
                     FileThumbCard(
                         file = file,
                         thumbManager = thumbManager,
+                        // Block file deletion clicks explicitly if the Ktor socket pipeline is listening
                         canRemove = !serverRunning,
                         onRemove = { onRemoveFile(file.id) }
                     )
@@ -137,6 +146,7 @@ fun FilesScreen(
     }
 }
 
+// Fallback visual frame context shown exclusively when the file list length hits 0
 @Composable
 private fun EmptyFilesState(onPick: () -> Unit) {
     Column(

@@ -465,7 +465,8 @@
 <script>
     'use strict';
 
-    // This safely reads exactly up to "/share/id" even if loaded from "/share/id/index.html" inside AVD Chrome
+    // Base URL Extractor: Safe mapping logic to parse exact base roots
+    // even if loaded via sub-directory variants (e.g. /share/abcde/index.html)
     const SESSION_BASE = window.location.pathname.split('/').slice(0, 3).join('/');
     const API_FILES  = `${SESSION_BASE}/api/files`;
     const previewUrl = id => `${SESSION_BASE}/preview/${id}`;
@@ -479,6 +480,7 @@
     let currentQuery  = '';
     let ovIndex       = -1;
 
+    // Fetch Milestone: Calls your custom Ktor endpoint to ingest files metadata arrays
     async function init() {
         try {
             const res = await fetch(API_FILES, { cache: 'no-store' });
@@ -490,6 +492,7 @@
         }
     }
 
+    // Fallback UI State if the target node server drops offline mid-session
     function renderError() {
         document.getElementById('gridView').innerHTML = `
             <div class="empty-state" style="grid-column:1/-1">
@@ -500,6 +503,7 @@
         document.getElementById('pageSub').textContent = '';
     }
 
+    // Filters search queries and sidebar category types synchronously across structural indexes
     function applyFilter() {
         const q = currentQuery.toLowerCase();
         filtered = allFiles.filter(f => {
@@ -530,6 +534,7 @@
         applyFilter();
     });
 
+    // Renders Card Portfolio Grid View elements
     function renderGrid() {
         const el = document.getElementById('gridView');
         if (!filtered.length) {
@@ -563,6 +568,7 @@
         }).join('');
     }
 
+    // Renders List Layout Row elements
     function renderList() {
         const el = document.getElementById('listBody');
         if (!filtered.length) { el.innerHTML = ''; return; }
@@ -585,9 +591,11 @@
         }).join('');
     }
 
+    // Handles smart multi-selection clicks vs single item preview window openings
     function cardClick(e, idx) {
         const el = e.currentTarget;
         const rect = el.getBoundingClientRect();
+        // Maps click boundary metrics to see if click targets are inside the upper-left select dot region
         const inCheck = (e.clientX - rect.left < 44) && (e.clientY - rect.top < 44);
 
         if (inCheck || selected.size > 0) {
@@ -627,6 +635,7 @@
         document.getElementById('listBtn').classList.toggle('active', v === 'list');
     }
 
+    // Modal Manager: Handles media parsing overrides inside an immersive blur overlay panel
     function openOverlay(idx) {
         ovIndex = idx;
         const f = filtered[idx];
@@ -645,6 +654,7 @@
 
         sw.style.display = 'none'; body.innerHTML = '';
 
+        // Dynamic routing template injectors based on MIME classification maps
         if (g === 'image') {
             body.innerHTML = `<img src="${fileUrl(f.id)}" alt="${esc(f.name)}" onerror="this.parentElement.innerHTML='${noPreviewHtml()}'">`;
         } else if (g === 'video') {
@@ -676,6 +686,7 @@
         if (e && e.target !== document.getElementById('overlay')) return;
         document.getElementById('overlay').classList.remove('on');
         document.body.style.overflow = '';
+        // Releases active hardware processing scopes by flushing structural media tracks completely on view close
         document.getElementById('ovBody').querySelectorAll('video,audio').forEach(m => { m.pause(); m.src = ''; });
     }
 
@@ -686,6 +697,7 @@
         openOverlay(next);
     }
 
+    // Streams bytes incrementally through fetch pipelines to construct a fluid local percentage download indicator UI
     async function triggerDownload(f) {
         const strip   = document.getElementById('dlStrip');
         const nameEl  = document.getElementById('dlName');
@@ -700,7 +712,7 @@
             if (!res.ok) throw new Error('Network execution boundary drop');
 
             const total  = parseInt(res.headers.get('content-length') || '0');
-            const reader = res.body.getReader();
+            const reader = res.body.getReader(); // Hooks into the incoming stream reader thread
             const chunks = [];
             let received = 0;
 
@@ -718,6 +730,7 @@
             fillEl.style.width = '100%'; pctEl.textContent = '100%';
             const blob = new Blob(chunks);
             const url  = URL.createObjectURL(blob);
+            // Creates an abstract anchor node component element to invoke native system file download frames cleanly
             const a    = Object.assign(document.createElement('a'), { href: url, download: f.name });
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
             URL.revokeObjectURL(url);
@@ -728,16 +741,19 @@
         }
     }
 
+    // Batched Sequential Multi-part Download Scheduler Pipeline
     async function downloadSelected() {
         const toGet = [...selected].map(id => allFiles.find(f => f.id === id)).filter(Boolean);
         if (!toGet.length) return;
         toast(`Staging multi-part pipeline arrays…`);
         for (let i = 0; i < toGet.length; i++) {
+            // Injects a deliberate 400ms thread window delay spacing barrier to keep browser threads from choking on multiple file writes
             if (i > 0) await new Promise(r => setTimeout(r, 400));
             await triggerDownload(toGet[i]);
         }
     }
 
+    // Global Hardware Key Bindings Listener Matrix
     document.addEventListener('keydown', e => {
         const ov = document.getElementById('overlay');
         if (ov.classList.contains('on')) {
@@ -745,6 +761,7 @@
             if (e.key === 'ArrowLeft')  ovNavigate(-1);
             if (e.key === 'ArrowRight') ovNavigate(1);
         }
+        // Universal Shortcut Mapping: Ctrl+A / Cmd+A captures all matching items inside the current filter block
         if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !ov.classList.contains('on')) {
             e.preventDefault(); filtered.forEach(f => selected.add(f.id));
             updateSelUI(); renderGrid(); renderList();
@@ -787,6 +804,7 @@
         return map[mimeGroup(mime)] || map.other;
     }
 
+    // Structural Vector Asset Components
     function checkSvg(size = 10) { return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>`; }
     function dlIconSvg(s = 14) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`; }
 
@@ -796,10 +814,14 @@
         if (b < 1073741824) return `${(b/1048576).toFixed(1)} MB`;
         return `${(b/1073741824).toFixed(2)} GB`;
     }
+
     function fmtDate(ts) {
         if (!ts) return '—';
         return new Date(ts).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
     }
+
+    // Safety Escape Sanitizer: Prevents structural Cross-Site Scripting (XSS) injection injection vulnerabilities
+    // inside the browser client if a shared file metadata layout includes rogue HTML layout payload characters
     function esc(s) {
         return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }

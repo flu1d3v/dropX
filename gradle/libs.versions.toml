@@ -11,6 +11,7 @@ documentfile = "1.1.0"
 zxing = "3.5.4"
 
 [libraries]
+# Android Core & Jetpack Compose UI dependencies
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -20,6 +21,9 @@ androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graph
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+
+# Embedded Ktor HTTP Server stack (CIO engine handles asynchronous, non-blocking network sockets)
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core-jvm", version.ref = "ktor" }
 ktor-server-cio = { group = "io.ktor", name = "ktor-server-cio-jvm", version.ref = "ktor" }
 ktor-server-partial-content = { group = "io.ktor", name = "ktor-server-partial-content-jvm", version.ref = "ktor" }
@@ -28,12 +32,16 @@ ktor-http = { group = "io.ktor", name = "ktor-http-jvm", version.ref = "ktor" }
 ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-content-negotiation-jvm", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
 ktor-server-conditional-headers = { group = "io.ktor", name = "ktor-server-conditional-headers-jvm", version.ref = "ktor" }
+
+# Core Utilities
+# Documentfile is used in TransferManager to safely extract timestamp metadata from Scoped Storage URIs
 androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
+# ZXing is used in QRGenerator to convert local sharing URL routes into on-screen matrix graphics
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
-androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owasp-dependencycheck" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+# OWASP tool to scan open-source dependencies for known security CVE vulnerabilities on build
+owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owasp-dependencycheck" }

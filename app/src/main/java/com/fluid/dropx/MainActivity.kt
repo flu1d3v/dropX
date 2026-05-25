@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var transferManager: TransferManager
     private var onPickResult: ((List<android.net.Uri>) -> Unit)? = null
 
+    // System Picker Contract: Launches the standard system media/document selection frame asynchronously
     private val pickerLauncher =
         registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
             onPickResult?.invoke(uris)
@@ -50,12 +51,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Android 13 (API 33) and higher demands runtime clearance before posting active foreground status notifications
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
         }
 
         transferManager = TransferManager(this)
-        enableEdgeToEdge()
+        enableEdgeToEdge() // Injects content padding maps behind structural status bars
 
         setContent {
             DropXTheme {
@@ -63,7 +65,7 @@ class MainActivity : ComponentActivity() {
                     transferManager = transferManager,
                     onRequestPick = { callback ->
                         onPickResult = callback
-                        pickerLauncher.launch("*/*")
+                        pickerLauncher.launch("*/*") // Explicit wildcards accept any structural data asset format
                     }
                 )
             }
@@ -90,6 +92,8 @@ private fun DropXApp(
     val actionStop  = stringResource(R.string.intent_action_stop_server)
     val extraIp     = stringResource(R.string.intent_extra_ip)
 
+    // Master State Loop: Loops in the background every 2000ms to poll the real hardware/service layers.
+    // This serves as a heartbeat tracking loop keeping your UI state perfectly matched to the Ktor engine.
     LaunchedEffect(Unit) {
         var lastBoundIp: String? = selectedIp
             ?: NetworkManager.currentResult.hotspotIp
@@ -105,7 +109,8 @@ private fun DropXApp(
 
             val isCurrentlyRunning = TransferService.isEngineRunning
 
-
+            // Network Drop Protection: If the phone hops network adaptors mid-stream (e.g., leaving local Wi-Fi router bounds),
+            // instantly kill the service and dump active links before unauthorized external entities scrape endpoints.
             if (isCurrentlyRunning && newEffectiveIp != lastBoundIp) {
                 val stopIntent = Intent(context, TransferService::class.java).apply {
                     action = actionStop
@@ -118,6 +123,7 @@ private fun DropXApp(
                 lastBoundIp = newEffectiveIp
             }
 
+            // Flush changes straight to structural Compose state variables to invoke clean recompositions
             netData = freshNetData
             port    = TransferService.activePort
             running = isCurrentlyRunning
@@ -130,6 +136,7 @@ private fun DropXApp(
     val effectiveIp = selectedIp
         ?: netData.hotspotIp ?: netData.wifiIp ?: netData.unknownIp
 
+    // Dynamic Route URL Assembler tracking line
     val shareUrl = if (running && port > 0 && effectiveIp != null && TransferService.currentSessionId != null) {
         "http://$effectiveIp:$port/share/${TransferService.currentSessionId}"
     } else null
@@ -148,6 +155,7 @@ private fun DropXApp(
                     running = running,
                     shareUrl = shareUrl,
                     selectedIp = selectedIp,
+                    // Block adaptor modification choices if the server socket pipeline is active
                     onSelectIp = { ip -> if (!running) selectedIp = if (selectedIp == ip) null else ip },
                     onStartStop = {
                         if (running) {
@@ -160,6 +168,7 @@ private fun DropXApp(
                             files = FileRegistry.getAllMetadata()
                         } else {
                             if (effectiveIp != null) {
+                                // Foreground Initiation: Boots the service context through the system lifecycle controllers
                                 val startIntent = Intent(context, TransferService::class.java).apply {
                                     action = actionStart
                                     putExtra(extraIp, effectiveIp)
@@ -176,6 +185,8 @@ private fun DropXApp(
                     onPickFiles = {
                         onRequestPick { uris ->
                             if (uris.isNotEmpty()) {
+                                // UI-Level Appending Lock: If the server is actively running, append extra files
+                                // to the active catalog without knocking existing downloads offline.
                                 if (running) {
                                     transferManager.appendTransferSession(uris)
                                 } else {
@@ -199,6 +210,7 @@ private fun DropXApp(
     }
 }
 
+// Custom Navigation Bar for switching layout panels cleanly
 @Composable
 private fun DropXBottomBar(current: Screen, onSelect: (Screen) -> Unit) {
     NavigationBar(
