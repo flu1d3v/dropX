@@ -41,3 +41,6 @@ captures/
 .cxx/
 *.apk
 *.ap_
+# Build Release Artifacts Isolation
+app/release/
+release/
