@@ -87,8 +87,19 @@ class ThumbnailManager(private val context: Context) {
 
     private suspend fun generateAndStore(hash: String, uri: android.net.Uri, cacheFile: File): ByteArray? {
         return try {
-            // Calls Android OS platform native thumbnail extractor (handles videos, docs, and images safely)
-            val bitmap = context.contentResolver.loadThumbnail(uri, Size(256, 256), null)
+            val bitmap = try {
+                context.contentResolver.loadThumbnail(uri, Size(256, 256), null)
+            } catch (e: Exception) {
+                val retriever = android.media.MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(context, uri)
+                    retriever.getFrameAtTime(0)
+                } finally {
+                    retriever.release()
+                }
+            }
+
+            if (bitmap == null) return null
 
             val outputStream = java.io.ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
@@ -97,7 +108,6 @@ class ThumbnailManager(private val context: Context) {
             diskMutex.withLock {
                 cacheFile.parentFile?.mkdirs()
                 cacheFile.writeBytes(bytes)
-
                 val newSize = currentDiskUsage.addAndGet(bytes.size.toLong())
                 if (newSize > diskQuota) {
                     pruneDiskCache()
