@@ -37,7 +37,7 @@ http://<your-ip>:<port>/share/<session-id>/file/<file-id>
 
 ```
 
-You get this from the web portal or you can grab it from the share link shown in the app. Any player that can open an HTTP URL will work.
+You get this from the web portal. Any player that can open an HTTP URL will work.
 
 **Downloads** — if someone does want to save the file, the web portal handles it with a streaming download that shows real progress. Resumable if the connection drops mid-transfer.
 
@@ -107,6 +107,8 @@ This is a local network tool and the security model reflects that. Honest about 
 **Read-only** — receivers can only download. There is no upload endpoint. The server exposes no write surface.
 
 **Nothing leaves the device** — no telemetry, no analytics, no crash reporting, no ads SDK, nothing phoning home.
+
+**Full threat model and security pipeline** documented in [THREAT_MODEL.md](THREAT_MODEL.md).
 
 ---
 
