@@ -69,9 +69,12 @@ Full dependency tracking inventory generated using CycloneDX Gradle engine proto
 
 **Vulnerability Tracking**
 Method: External agent monitoring the SBOM for new CVEs after release
-Status: `PLANNED`
+Status: `ACTIVE`
 
-The exported CycloneDX SBOM is structured and ready to be plugged into automated monitoring tools (like Dependency-Track or GitHub Dependency Graph alerts) to track incoming CVEs post-release.
+Dependabot alerts enabled on the repository. Monitors all dependencies 
+declared in libs.versions.toml for newly discovered CVEs post-release. 
+Dependabot security updates enabled — automatically opens a pull request 
+when a patched version of an affected dependency is available.
 
 ---
 
