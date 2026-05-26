@@ -12,7 +12,7 @@ Lightweight. No ads. No tracking. Everything stays on your network.
 |:---:|:---:|:---:|:---:|
 | ![](docs/screenshots/1.dropX_app_configure_screen.jpeg) | ![](docs/screenshots/2.dropX_app_start_server.jpeg) | ![](docs/screenshots/3.dropX_app_share_qr.jpeg) | ![](docs/screenshots/4.dropX_app_files_screen.jpeg) |
 
-| Web Portal Main | Web Portal Directory | Image Preview | Video Player Stream |
+| Web Portal Directory | Web Portal Main | Image Preview | Video Player Stream |
 |:---:|:---:|:---:|:---:|
 | ![](docs/screenshots/5.dropX_web.png) | ![](docs/screenshots/6.dropX_web_all_files.png) | ![](docs/screenshots/7.dropX_web_image_stream.png) | ![](docs/screenshots/8.dropX_web_video_stream.png) |
 
