@@ -9,6 +9,7 @@ owasp-dependencycheck = "12.2.2"
 ktor = "3.5.0"
 documentfile = "1.1.0"
 zxing = "3.5.4"
+cyclonedx = "3.2.4"
 
 [libraries]
 # Android Core & Jetpack Compose UI dependencies
@@ -45,3 +46,5 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 # OWASP tool to scan open-source dependencies for known security CVE vulnerabilities on build
 owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owasp-dependencycheck" }
+# Software Bill of Materials (SBOM) generator plugin for inventory audits
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }

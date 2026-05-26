@@ -6,4 +6,5 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.owasp.dependencycheck) apply false
     alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.cyclonedx) apply false
 }

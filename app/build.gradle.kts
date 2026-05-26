@@ -14,6 +14,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.owasp.dependencycheck)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.cyclonedx)
 }
 
 android {
@@ -94,3 +95,5 @@ dependencyCheck {
     }
     suppressionFile = "project-suppressions.xml" // Ignores known non-applicable false-positives
 }
+
+tasks.named("cyclonedxBom")
