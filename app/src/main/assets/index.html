@@ -224,12 +224,12 @@
         .grid:not(.on) { display: none; }
 
         .list-hdr {
-            display: grid; grid-template-columns: 24px 36px 1fr 110px 130px 64px; gap: 12px; align-items: center;
+            display: grid; grid-template-columns: 24px 36px 1fr 110px 130px 100px; gap: 12px; align-items: center;
             padding: 10px 16px; border-bottom: 1px solid var(--border);
             font-size: 11px; font-weight: 600; color: var(--t2); letter-spacing: .4px; text-transform: uppercase;
         }
         .list-row {
-            display: grid; grid-template-columns: 24px 36px 1fr 110px 130px 64px; gap: 12px; align-items: center;
+            display: grid; grid-template-columns: 24px 36px 1fr 110px 130px 100px; gap: 12px; align-items: center;
             padding: 10px 16px; border-radius: var(--r); cursor: pointer;
             transition: background var(--transition); font-size: 13px;
             border: 1px solid transparent; margin: 4px 0;
@@ -442,6 +442,10 @@
         </div>
         <div class="ov-body" id="ovBody"></div>
         <div class="ov-foot">
+            <button class="btn btn-ghost btn-sm" id="ovCopy" title="Copy direct link (paste into VLC, MX Player…)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                Copy link
+            </button>
             <div id="ovStreamWrap" style="display:none">
                 <button class="btn btn-ghost btn-sm" id="ovStream">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>
@@ -582,8 +586,11 @@
                 <div class="list-name"><span title="${esc(f.name)}">${esc(f.name)}</span></div>
                 <div class="list-meta">${fmtSize(f.size)}</div>
                 <div class="list-meta">${fmtDate(f.lastModified)}</div>
-                <div>
-                    <a href="${fileUrl(f.id)}" download="${esc(f.name)}" onclick="event.stopPropagation();toast('Streaming file payload…')" class="btn btn-ghost btn-sm" style="padding:4px 10px">
+                <div style="display:flex;gap:6px">
+                    <button class="btn btn-ghost btn-sm" title="Copy link" aria-label="Copy link" onclick="event.stopPropagation();copyLink(filtered[${i}])" style="padding:4px 10px">
+                        ${linkIconSvg(12)}
+                    </button>
+                    <a href="${fileUrl(f.id)}" download="${esc(f.name)}" onclick="event.stopPropagation();toast('Streaming file payload…')" class="btn btn-ghost btn-sm" style="padding:4px 10px" aria-label="Download">
                         ${dlIconSvg(12)}
                     </a>
                 </div>
@@ -645,6 +652,7 @@
         document.getElementById('ovMeta').innerHTML = `${fmtSize(f.size)} &bull; ${fmtDate(f.lastModified)}`;
 
         document.getElementById('ovDl').onclick = () => triggerDownload(f);
+        document.getElementById('ovCopy').onclick = () => copyLink(f);
         document.getElementById('ovPrev').disabled = idx <= 0;
         document.getElementById('ovNext').disabled = idx >= filtered.length - 1;
 
@@ -767,6 +775,33 @@
             updateSelUI(); renderGrid(); renderList();
         }
     });
+
+    function linkIconSvg(s = 14) { return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>`; }
+
+    // Copies the full direct URL of a file. Works on plain http:// pages too
+    // (navigator.clipboard is unavailable there, so we fall back to execCommand).
+    async function copyLink(f) {
+        const text = location.origin + fileUrl(f.id);
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (!ok) throw new Error('copy failed');
+            }
+            toast('Link copied');
+        } catch (e) {
+            window.prompt('Copy this link:', text);   // last-resort manual copy
+        }
+    }
 
     function toast(msg) {
         const wrap = document.getElementById('toastWrap');
