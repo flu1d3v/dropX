@@ -33,7 +33,6 @@ import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
-import io.ktor.utils.io.jvm.javaio.toByteReadChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -214,20 +213,15 @@ class TransferService : Service() {
                                     return@get call.respond(HttpStatusCode.NotFound)
                                 }
 
-                                // High Performance Channel: Reads directly from Android contentResolver input stream
-                                // and transforms it into a non-blocking ByteReadChannel. This bypasses RAM fragmentation,
-                                // allowing multi-gigabyte 4K movies to stream out without crashing with OutOfMemory errors.
-                                val content = object : io.ktor.http.content.OutgoingContent.ReadChannelContent() {
-                                    override val contentType = ContentType.parse(metadata.mimeType)
-                                    override val contentLength = metadata.size
-                                    override fun readFrom() = contentResolver.openInputStream(uri)
-                                        ?.toByteReadChannel(context = Dispatchers.IO)
-                                        ?: throw Exception(getString(R.string.error_stream_unavailable))
-                                }
+                                // Safe MIME parsing: a weird mime string must not crash the request
+                                val type = runCatching { ContentType.parse(metadata.mimeType) }
+                                    .getOrDefault(ContentType.Application.OctetStream)
 
-                                // Forces the client browser to treat the incoming bytes as a downloadable attachment asset
-                                call.response.header(HttpHeaders.ContentDisposition, "inline; filename=\"${metadata.name}\"")
-                                call.respond(content)
+                                // ?download=1  -> force "Save as";  otherwise inline (video/audio/pdf preview)
+                                val asAttachment = call.request.queryParameters["download"] == "1"
+                                call.response.header(HttpHeaders.ContentDisposition, contentDisposition(metadata.name, asAttachment))
+
+                                call.respond(UriFileContent(applicationContext, uri, type, metadata.size))
                             }
                         }
                     }
@@ -303,4 +297,13 @@ class TransferService : Service() {
         isEngineRunning = false
         super.onDestroy()
     }
+}
+
+private fun contentDisposition(name: String, attachment: Boolean): String {
+    val kind = if (attachment) "attachment" else "inline"
+    // ASCII-only fallback for old clients
+    val ascii = name.map { if (it.code in 32..126 && it != '"' && it != '\\') it else '_' }.joinToString("")
+    // RFC 5987 UTF-8 version for modern browsers/VLC
+    val utf8 = java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20")
+    return "$kind; filename=\"$ascii\"; filename*=UTF-8''$utf8"
 }
