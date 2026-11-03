@@ -60,4 +60,13 @@
     <string name="intent_action_start_server">ACTION_START_SERVER</string>
     <string name="intent_action_stop_server">ACTION_STOP_SERVER</string>
     <string name="intent_extra_ip">EXTRA_IP</string>
+
+    <string name="menu_copy_link">Copy link</string>
+    <string name="menu_open_with">Open with…</string>
+    <string name="menu_remove">Remove</string>
+    <string name="cd_file_options">File options</string>
+    <string name="cd_remove_file">Remove file</string>
+    <string name="toast_link_copied">Link copied</string>
+    <string name="toast_start_server_first">Start the server to copy a link</string>
+    <string name="chooser_open_with">Open file with…</string>
 </resources>

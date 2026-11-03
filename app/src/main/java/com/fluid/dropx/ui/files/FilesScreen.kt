@@ -29,6 +29,7 @@ import com.fluid.dropx.model.FileMetadata
 fun FilesScreen(
     files        : List<FileMetadata>,
     serverRunning: Boolean,
+    shareUrl     : String?,
     onPickFiles  : () -> Unit,
     onRemoveFile : (String) -> Unit,
 ) {
@@ -138,6 +139,7 @@ fun FilesScreen(
                         thumbManager = thumbManager,
                         // Block file deletion clicks explicitly if the Ktor socket pipeline is listening
                         canRemove = !serverRunning,
+                        shareUrl = shareUrl,
                         onRemove = { onRemoveFile(file.id) }
                     )
                 }

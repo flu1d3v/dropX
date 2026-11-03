@@ -1,8 +1,12 @@
 package com.fluid.dropx.ui.files
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,8 +15,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -40,31 +51,58 @@ fun FileThumbCard(
     file        : FileMetadata,
     thumbManager: ThumbnailManager,
     canRemove   : Boolean,
+    shareUrl    : String?,          // e.g. http://192.168.1.5:50505/share/abc123  (null when server is stopped)
     onRemove    : () -> Unit,
 ) {
     val context = LocalContext.current
     var bmp by remember(file.id) { mutableStateOf<Bitmap?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
     val uri = remember(file.id) { FileRegistry.getUri(file.id) }
-    val errorString = stringResource(R.string.error_unsupported_type)
+
+    val errorString     = stringResource(R.string.error_unsupported_type)
+    val chooserTitle    = stringResource(R.string.chooser_open_with)
+    val copiedMsg       = stringResource(R.string.toast_link_copied)
+    val needServerMsg   = stringResource(R.string.toast_start_server_first)
 
     // Side Effect: Triggered automatically whenever the card mounts or the target file.id changes.
     LaunchedEffect(key1 = file.id) {
         if (uri != null) {
-            // Dispatches to the IO thread pool so processing binary bitmap arrays doesn't drop UI frame rates
             val decodedBitmap = withContext(kotlinx.coroutines.Dispatchers.IO) {
                 runCatching {
-                    val bytes = thumbManager.getThumbnail(
-                        file.name,
-                        uri,
-                        file.size,
-                        file.lastModified
-                    )
-                    if (bytes != null) {
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    } else null
+                    val bytes = thumbManager.getThumbnail(file.name, uri, file.size, file.lastModified)
+                    if (bytes != null) BitmapFactory.decodeByteArray(bytes, 0, bytes.size) else null
                 }.getOrNull()
             }
-            bmp = decodedBitmap // Pushes the bitmap back to the main thread to force layout refresh
+            bmp = decodedBitmap
+        }
+    }
+
+    fun openFile() {
+        if (uri == null) return
+        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, file.mimeType)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        runCatching {
+            context.startActivity(Intent.createChooser(viewIntent, chooserTitle))
+        }.onFailure {
+            Toast.makeText(context, errorString, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Copies the direct stream/download URL for this single file (paste it into VLC / MX Player etc.)
+    fun copyLink() {
+        val base = shareUrl
+        if (base == null) {
+            Toast.makeText(context, needServerMsg, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val link = "$base/file/${file.id}"
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("dropX link", link))
+        // Android 13+ shows its own "copied" confirmation; older versions need our toast
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            Toast.makeText(context, copiedMsg, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -72,23 +110,7 @@ fun FileThumbCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable {
-                    if (uri != null) {
-                        // Broadcast Intent: Invokes the native Android system file viewer matching the target MIME type
-                        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, file.mimeType)
-                            // Crucial flag: grants temporary workspace access rights to the external viewing app
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-
-                        runCatching {
-                            val chooserIntent = Intent.createChooser(viewIntent, "Open file with...")
-                            context.startActivity(chooserIntent)
-                        }.onFailure {
-                            Toast.makeText(context, errorString, Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
+                .clickable { openFile() }
         ) {
             // Top Preview Container Box Area
             Box(
@@ -99,7 +121,6 @@ fun FileThumbCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (bmp != null) {
-                    // Render image thumbnail if the bitmap decoder extraction succeeded
                     Image(
                         bitmap = bmp!!.asImageBitmap(),
                         contentDescription = file.name,
@@ -107,7 +128,6 @@ fun FileThumbCard(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    // Fallback state placeholder: Displays an explicit colored vector asset block matching the MIME class
                     Box(
                         modifier = Modifier
                             .size(52.dp)
@@ -124,7 +144,7 @@ fun FileThumbCard(
                     }
                 }
 
-                // Delete Floating Action Layer: hidden automatically if the server engine is active
+                // Quick remove button on the thumbnail (hidden while the server is live)
                 if (canRemove) {
                     Box(
                         modifier = Modifier
@@ -138,7 +158,7 @@ fun FileThumbCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.cd_remove_file),
                             tint = Color.White,
                             modifier = Modifier.size(13.dp)
                         )
@@ -164,21 +184,65 @@ fun FileThumbCard(
                 }
             }
 
-            // Bottom Description metadata text labels
-            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                Text(
-                    text = file.name,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, // Clips text overflow with cleanly trailing trailing dots
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = formatBytes(file.size),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            // Bottom row: name + size on the left, three-dot menu on the right
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 6.dp)
+                ) {
+                    Text(
+                        text = file.name,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = formatBytes(file.size),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = stringResource(R.string.cd_file_options),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.menu_copy_link)) },
+                            leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
+                            onClick = { menuOpen = false; copyLink() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.menu_open_with)) },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) },
+                            onClick = { menuOpen = false; openFile() }
+                        )
+                        if (canRemove) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_remove)) },
+                                leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                                onClick = { menuOpen = false; onRemove() }
+                            )
+                        }
+                    }
+                }
             }
         }
     }

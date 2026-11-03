@@ -182,6 +182,7 @@ private fun DropXApp(
                 Screen.Files -> FilesScreen(
                     files = files,
                     serverRunning = running,
+                    shareUrl = shareUrl,
                     onPickFiles = {
                         onRequestPick { uris ->
                             if (uris.isNotEmpty()) {
