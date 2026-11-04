@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>dropX — Web Share Portal</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -60,7 +59,7 @@
         }
 
         body {
-            font-family: 'DM Sans', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: var(--bg);
             color: var(--t1);
             min-height: 100vh;
@@ -290,19 +289,7 @@
         .toast-wrap { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; align-items: center; }
         .toast { background: #1c1c1e; color: #ffffff; border: 1px solid #2c2c2e; padding: 10px 20px; border-radius: var(--r-full); font-size: 13px; font-weight: 500; pointer-events: auto; box-shadow: var(--shadow-lg); animation: toastIn 180ms ease, toastOut 180ms ease 2.6s forwards; }
         @keyframes toastOut { to { opacity: 0; transform: translateY(4px); } }
-
-        /* ─── Streaming Progress Core ────────────────────────────── */
-        .dl-strip {
-            position: fixed; bottom: 0; left: 0; right: 0; z-index: 250;
-            background: var(--surface); border-top: 1px solid var(--border);
-            display: flex; align-items: center; gap: 16px; padding: 14px 32px; font-size: 13px;
-            transform: translateY(100%); transition: transform 250ms cubic-bezier(.16, 1, .3, 1);
-        }
-        .dl-strip.on { transform: translateY(0); }
-        .dl-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t1); font-weight: 500; }
-        .dl-bar { flex: 1; height: 4px; background: var(--bg); border-radius: 2px; max-width: 320px; overflow: hidden; }
-        .dl-fill { height: 100%; background: var(--t1); width: 0%; transition: width 150ms ease; }
-        .dl-pct { font-size: 12px; color: var(--t2); min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
         /* ─── Color Identifiers ──────────────────────────────────── */
         .ti { color: var(--green); } .tv { color: var(--pink); } .ta { color: var(--purple); } .tp { color: var(--red); } .tz { color: var(--orange); } .to { color: var(--slate); }
@@ -457,13 +444,6 @@
     </div>
 </div>
 
-<div class="dl-strip" id="dlStrip">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    <span class="dl-name" id="dlName"></span>
-    <div class="dl-bar"><div class="dl-fill" id="dlFill"></div></div>
-    <span class="dl-pct" id="dlPct">0%</span>
-</div>
-
 <div class="toast-wrap" id="toastWrap"></div>
 
 <script>
@@ -590,7 +570,7 @@
                     <button class="btn btn-ghost btn-sm" title="Copy link" aria-label="Copy link" onclick="event.stopPropagation();copyLink(filtered[${i}])" style="padding:4px 10px">
                         ${linkIconSvg(12)}
                     </button>
-                    <a href="${fileUrl(f.id)}" download="${esc(f.name)}" onclick="event.stopPropagation();toast('Streaming file payload…')" class="btn btn-ghost btn-sm" style="padding:4px 10px" aria-label="Download">
+                    <a href="${fileUrl(f.id)}?download=1" download="${esc(f.name)}" onclick="event.stopPropagation();toast('Streaming file payload…')" class="btn btn-ghost btn-sm" style="padding:4px 10px" aria-label="Download">
                         ${dlIconSvg(12)}
                     </a>
                 </div>
@@ -664,12 +644,12 @@
 
         // Dynamic routing template injectors based on MIME classification maps
         if (g === 'image') {
-            body.innerHTML = `<img src="${fileUrl(f.id)}" alt="${esc(f.name)}" onerror="this.parentElement.innerHTML='${noPreviewHtml()}'">`;
+            body.innerHTML = `<img src="${fileUrl(f.id)}" alt="${esc(f.name)}" onerror="showNoPreview(this)">`;
         } else if (g === 'video') {
-            body.innerHTML = `<video controls autoplay preload="metadata"><source src="${fileUrl(f.id)}" type="${f.mimeType}"></video>`;
+            body.innerHTML = `<video controls autoplay preload="metadata"><source src="${fileUrl(f.id)}" type="${esc(f.mimeType)}"></video>`;
             sw.style.display = ''; document.getElementById('ovStream').onclick = () => window.open(fileUrl(f.id), '_blank');
         } else if (g === 'audio') {
-            body.innerHTML = `<audio controls autoplay><source src="${fileUrl(f.id)}" type="${f.mimeType}"></audio>`;
+            body.innerHTML = `<audio controls autoplay><source src="${fileUrl(f.id)}" type="${esc(f.mimeType)}"></audio>`;
             sw.style.display = ''; document.getElementById('ovStream').onclick = () => window.open(fileUrl(f.id), '_blank');
         } else if (g === 'pdf') {
             body.innerHTML = `<iframe src="${fileUrl(f.id)}#toolbar=1" title="${esc(f.name)}"></iframe>`;
@@ -690,74 +670,53 @@
         return `<div class='no-preview'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5'><path d='M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z'/><polyline points='13 2 13 9 20 9'/></svg><p>Preview initialization failed</p></div>`;
     }
 
+    function showNoPreview(img) { img.parentElement.innerHTML = noPreviewHtml(); }
+
     function ovClose(e) {
         if (e && e.target !== document.getElementById('overlay')) return;
         document.getElementById('overlay').classList.remove('on');
         document.body.style.overflow = '';
         // Releases active hardware processing scopes by flushing structural media tracks completely on view close
-        document.getElementById('ovBody').querySelectorAll('video,audio').forEach(m => { m.pause(); m.src = ''; });
+        stopMedia();
     }
 
     function ovNavigate(dir) {
         const next = ovIndex + dir;
         if (next < 0 || next >= filtered.length) return;
-        document.getElementById('ovBody').querySelectorAll('video,audio').forEach(m => { m.pause(); m.src = ''; });
+        stopMedia();
         openOverlay(next);
     }
 
-    // Streams bytes incrementally through fetch pipelines to construct a fluid local percentage download indicator UI
-    async function triggerDownload(f) {
-        const strip   = document.getElementById('dlStrip');
-        const nameEl  = document.getElementById('dlName');
-        const fillEl  = document.getElementById('dlFill');
-        const pctEl   = document.getElementById('dlPct');
+    function stopMedia() {
+    document.getElementById('ovBody').querySelectorAll('video,audio').forEach(m => {
+        m.pause();
+        m.removeAttribute('src');
+        m.querySelectorAll('source').forEach(s => s.remove());
+        m.load();   // aborts the pending request so the server stops reading
+    });
+}
 
-        nameEl.textContent = f.name; fillEl.style.width = '0%'; pctEl.textContent = '0%';
-        strip.classList.add('on');
-
-        try {
-            const res = await fetch(fileUrl(f.id));
-            if (!res.ok) throw new Error('Network execution boundary drop');
-
-            const total  = parseInt(res.headers.get('content-length') || '0');
-            const reader = res.body.getReader(); // Hooks into the incoming stream reader thread
-            const chunks = [];
-            let received = 0;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
-                received += value.length;
-                if (total > 0) {
-                    const pct = Math.round(received / total * 100);
-                    fillEl.style.width = pct + '%'; pctEl.textContent = pct + '%';
-                }
-            }
-
-            fillEl.style.width = '100%'; pctEl.textContent = '100%';
-            const blob = new Blob(chunks);
-            const url  = URL.createObjectURL(blob);
-            // Creates an abstract anchor node component element to invoke native system file download frames cleanly
-            const a    = Object.assign(document.createElement('a'), { href: url, download: f.name });
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (err) {
-            toast('Download link transmission failure');
-        } finally {
-            setTimeout(() => strip.classList.remove('on'), 1000);
-        }
+    // Hands the file to the browser's own download manager. The server streams it
+    // straight to disk, so even multi-GB files never sit in browser memory.
+    function triggerDownload(f) {
+        const a = document.createElement('a');
+        a.href = fileUrl(f.id) + '?download=1';   // server answers with Content-Disposition: attachment
+        a.download = f.name;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast(`Downloading ${f.name}…`);
     }
 
     // Batched Sequential Multi-part Download Scheduler Pipeline
     async function downloadSelected() {
         const toGet = [...selected].map(id => allFiles.find(f => f.id === id)).filter(Boolean);
         if (!toGet.length) return;
-        toast(`Staging multi-part pipeline arrays…`);
+        toast(`Starting ${toGet.length} download${toGet.length > 1 ? 's' : ''}…`);
         for (let i = 0; i < toGet.length; i++) {
-            // Injects a deliberate 400ms thread window delay spacing barrier to keep browser threads from choking on multiple file writes
-            if (i > 0) await new Promise(r => setTimeout(r, 400));
-            await triggerDownload(toGet[i]);
+            if (i > 0) await new Promise(r => setTimeout(r, 800));  // small gap so browsers accept each one
+            triggerDownload(toGet[i]);
         }
     }
 
