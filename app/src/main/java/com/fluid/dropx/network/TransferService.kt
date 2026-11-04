@@ -65,7 +65,7 @@ class TransferService : Service() {
     // Prevents two quick start intents from booting two servers.
     private val engineRequested = AtomicBoolean(false)
 
-    private val thumbnailManager by lazy { ThumbnailManager(applicationContext) }
+    private val thumbnailManager by lazy { ThumbnailManager.get(applicationContext) }
 
     // Caches the web portal's index.html frontend layout into memory so we aren't hammering disk I/O on every request
     private val indexHtmlBytes by lazy {

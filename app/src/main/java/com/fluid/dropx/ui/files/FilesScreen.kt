@@ -35,7 +35,7 @@ fun FilesScreen(
 ) {
     val context = LocalContext.current
     // Remembers the instance across view recompositions so we don't dump and recreate the thumbnail caches
-    val thumbManager = remember { ThumbnailManager(context) }
+    val thumbManager = remember { ThumbnailManager.get(context) }
 
     Column(
         modifier = Modifier
