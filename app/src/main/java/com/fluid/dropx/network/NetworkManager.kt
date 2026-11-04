@@ -35,6 +35,13 @@ object NetworkManager {
         return result
     }
 
+    // True if nothing else is currently using this port (used to keep the same port on resume)
+    fun isPortFree(port: Int): Boolean = try {
+        java.net.ServerSocket(port).use { true }
+    } catch (e: Exception) {
+        false
+    }
+
     // Loops through all device hardware network cards to trap local IPv4 addresses.
     private fun getLocalNetworkData(): NetworkResult {
         var hotspotIp: String? = null
