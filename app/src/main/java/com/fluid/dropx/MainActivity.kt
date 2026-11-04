@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fluid.dropx.core.FileRegistry
+import com.fluid.dropx.core.SessionStore
 import com.fluid.dropx.core.TransferManager
 import com.fluid.dropx.network.NetworkManager
 import com.fluid.dropx.network.TransferService
@@ -33,7 +34,9 @@ import com.fluid.dropx.ui.configure.ConfigureScreen
 import com.fluid.dropx.ui.configure.QrDialog
 import com.fluid.dropx.ui.files.FilesScreen
 import com.fluid.dropx.ui.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 enum class Screen { Configure, Files }
 
@@ -41,6 +44,9 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var transferManager: TransferManager
     private var onPickResult: ((List<android.net.Uri>) -> Unit)? = null
+
+    // Set when the user taps the "Sharing paused" notification
+    private var resumeRequested by mutableStateOf(false)
 
     // System Picker Contract: Launches the standard system media/document selection frame asynchronously
     private val pickerLauncher =
@@ -51,7 +57,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Android 13 (API 33) and higher demands runtime clearance before posting active foreground status notifications
+        // Android 13 (API 33) and higher demands runtime clearance before posting notifications
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
         }
@@ -59,10 +65,14 @@ class MainActivity : ComponentActivity() {
         transferManager = TransferManager(this)
         enableEdgeToEdge() // Injects content padding maps behind structural status bars
 
+        resumeRequested = intent?.action == TransferService.ACTION_RESUME_SHARING
+
         setContent {
             DropXTheme {
                 DropXApp(
                     transferManager = transferManager,
+                    resumeRequested = resumeRequested,
+                    onResumeHandled = { resumeRequested = false },
                     onRequestPick = { callback ->
                         onPickResult = callback
                         pickerLauncher.launch("*/*") // Explicit wildcards accept any structural data asset format
@@ -71,29 +81,38 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // The app is already open and the user taps the "Sharing paused" notification
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == TransferService.ACTION_RESUME_SHARING) {
+            resumeRequested = true
+        }
+    }
 }
 
 @Composable
 private fun DropXApp(
     transferManager: TransferManager,
+    resumeRequested: Boolean,
+    onResumeHandled: () -> Unit,
     onRequestPick: (callback: (List<android.net.Uri>) -> Unit) -> Unit
 ) {
-    var screen      by remember { mutableStateOf(Screen.Configure) }
-    var running     by remember { mutableStateOf(false) }
-    var showQr      by remember { mutableStateOf(false) }
-    var netData     by remember { mutableStateOf(NetworkManager.currentResult) }
-    var port        by remember { mutableIntStateOf(0) }
-    var selectedIp  by remember { mutableStateOf<String?>(null) }
-    var files       by remember { mutableStateOf(FileRegistry.getAllMetadata()) }
+    var screen        by remember { mutableStateOf(Screen.Configure) }
+    var running       by remember { mutableStateOf(false) }
+    var showQr        by remember { mutableStateOf(false) }
+    var netData       by remember { mutableStateOf(NetworkManager.currentResult) }
+    var port          by remember { mutableIntStateOf(0) }
+    var selectedIp    by remember { mutableStateOf<String?>(null) }
+    var files         by remember { mutableStateOf(FileRegistry.getAllMetadata()) }
+    var resumeTrigger by remember { mutableIntStateOf(0) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
+    var pausedByLimit by remember { mutableStateOf(SessionStore.isPaused(context)) }
 
-    val actionStart = stringResource(R.string.intent_action_start_server)
-    val actionStop  = stringResource(R.string.intent_action_stop_server)
-    val extraIp     = stringResource(R.string.intent_extra_ip)
-
-    // Master State Loop: Loops in the background every 2000ms to poll the real hardware/service layers.
-    // This serves as a heartbeat tracking loop keeping your UI state perfectly matched to the Ktor engine.
+    // Master State Loop: polls the real hardware/service layers every 2 seconds
+    // so the UI always matches the Ktor engine.
     LaunchedEffect(Unit) {
         var lastBoundIp: String? = selectedIp
             ?: NetworkManager.currentResult.hotspotIp
@@ -109,34 +128,52 @@ private fun DropXApp(
 
             val isCurrentlyRunning = TransferService.isEngineRunning
 
-            // Network Drop Protection: If the phone hops network adaptors mid-stream (e.g., leaving local Wi-Fi router bounds),
-            // instantly kill the service and dump active links before unauthorized external entities scrape endpoints.
+            // Network Drop Protection: if the phone hops network adapters mid-stream, stop the service
+            // instead of exposing the files on a different network.
             if (isCurrentlyRunning && newEffectiveIp != lastBoundIp) {
-                val stopIntent = Intent(context, TransferService::class.java).apply {
-                    action = actionStop
-                }
-                context.startService(stopIntent)
-
+                TransferService.stop(context)
                 transferManager.stopTransferSession()
                 lastBoundIp = newEffectiveIp
             } else if (!isCurrentlyRunning) {
                 lastBoundIp = newEffectiveIp
             }
 
-            // Flush changes straight to structural Compose state variables to invoke clean recompositions
-            netData = freshNetData
-            port    = TransferService.activePort
-            running = isCurrentlyRunning
-            files   = FileRegistry.getAllMetadata()
+            netData       = freshNetData
+            port          = TransferService.activePort
+            running       = isCurrentlyRunning
+            pausedByLimit = !isCurrentlyRunning && SessionStore.isPaused(context)
+            files         = FileRegistry.getAllMetadata()
 
             delay(2000)
+        }
+    }
+
+    // A notification tap just asks for a resume; the real work happens in the effect below
+    LaunchedEffect(resumeRequested) {
+        if (resumeRequested) {
+            resumeTrigger++
+            onResumeHandled()
+        }
+    }
+
+    // Resume a paused session with the SAME port and session code (so existing links keep working).
+    // This runs while the app is on screen, which is what lets Android start a dataSync service again.
+    LaunchedEffect(resumeTrigger) {
+        if (resumeTrigger == 0) return@LaunchedEffect
+        val saved = SessionStore.loadPaused(context) ?: return@LaunchedEffect
+        if (TransferService.isEngineRunning) return@LaunchedEffect
+
+        val fresh = withContext(Dispatchers.IO) { NetworkManager.refreshNetworkData() }
+        val ip = selectedIp ?: fresh.hotspotIp ?: fresh.wifiIp ?: fresh.unknownIp
+        if (ip != null) {
+            TransferService.start(context, ip, saved.port, saved.sessionId)
         }
     }
 
     val effectiveIp = selectedIp
         ?: netData.hotspotIp ?: netData.wifiIp ?: netData.unknownIp
 
-    // Dynamic Route URL Assembler tracking line
+    // Dynamic Route URL Assembler
     val shareUrl = if (running && port > 0 && effectiveIp != null && TransferService.currentSessionId != null) {
         "http://$effectiveIp:$port/share/${TransferService.currentSessionId}"
     } else null
@@ -155,25 +192,19 @@ private fun DropXApp(
                     running = running,
                     shareUrl = shareUrl,
                     selectedIp = selectedIp,
-                    // Block adaptor modification choices if the server socket pipeline is active
+                    pausedByLimit = pausedByLimit,
+                    onResume = { resumeTrigger++ },
+                    // Block adapter changes while the server is active
                     onSelectIp = { ip -> if (!running) selectedIp = if (selectedIp == ip) null else ip },
                     onStartStop = {
                         if (running) {
-                            val stopIntent = Intent(context, TransferService::class.java).apply {
-                                action = actionStop
-                            }
-                            context.startService(stopIntent)
-
+                            TransferService.stop(context)
                             transferManager.stopTransferSession()
                             files = FileRegistry.getAllMetadata()
                         } else {
                             if (effectiveIp != null) {
-                                // Foreground Initiation: Boots the service context through the system lifecycle controllers
-                                val startIntent = Intent(context, TransferService::class.java).apply {
-                                    action = actionStart
-                                    putExtra(extraIp, effectiveIp)
-                                }
-                                context.startForegroundService(startIntent)
+                                // Foreground initiation through the lifecycle controllers (new session)
+                                TransferService.start(context, effectiveIp)
                             }
                         }
                     },
@@ -186,8 +217,8 @@ private fun DropXApp(
                     onPickFiles = {
                         onRequestPick { uris ->
                             if (uris.isNotEmpty()) {
-                                // UI-Level Appending Lock: If the server is actively running, append extra files
-                                // to the active catalog without knocking existing downloads offline.
+                                // If the server is running, append to the live catalog without
+                                // knocking existing downloads offline.
                                 if (running) {
                                     transferManager.appendTransferSession(uris)
                                 } else {

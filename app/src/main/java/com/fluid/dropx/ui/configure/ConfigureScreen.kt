@@ -59,6 +59,8 @@ fun ConfigureScreen(
     running    : Boolean,
     shareUrl   : String?,
     selectedIp : String?,
+    pausedByLimit: Boolean,
+    onResume   : () -> Unit,
     onSelectIp : (String) -> Unit,
     onStartStop: () -> Unit,
     onShowQr   : () -> Unit,
@@ -130,6 +132,34 @@ fun ConfigureScreen(
                         text = stringResource(R.string.banner_server_running),
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Medium
                     )
+                }
+            }
+
+            // Shown when Android paused sharing (6-hour background limit on Android 15+)
+            if (pausedByLimit && !running) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.banner_paused_by_limit),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onResume) {
+                        Text(
+                            text = stringResource(R.string.action_resume),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 

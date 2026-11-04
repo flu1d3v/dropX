@@ -57,10 +57,6 @@
     <string name="nav_tab_configure">Configure</string>
     <string name="nav_tab_files">Files</string>
 
-    <string name="intent_action_start_server">ACTION_START_SERVER</string>
-    <string name="intent_action_stop_server">ACTION_STOP_SERVER</string>
-    <string name="intent_extra_ip">EXTRA_IP</string>
-
     <string name="menu_copy_link">Copy link</string>
     <string name="menu_open_with">Open with…</string>
     <string name="menu_remove">Remove</string>
@@ -69,4 +65,11 @@
     <string name="toast_link_copied">Link copied</string>
     <string name="toast_start_server_first">Start the server to copy a link</string>
     <string name="chooser_open_with">Open file with…</string>
+
+    <string name="notification_alert_channel_name">Sharing alerts</string>
+    <string name="notification_alert_channel_description">Tells you when sharing is paused and needs your attention.</string>
+    <string name="notification_paused_title">Sharing paused</string>
+    <string name="notification_paused_text">Android limits long background transfers to about 6 hours. Tap to resume with the same link.</string>
+    <string name="banner_paused_by_limit">Sharing was paused by Android\'s background limit.</string>
+    <string name="action_resume">Resume</string>
 </resources>
