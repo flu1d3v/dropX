@@ -120,7 +120,7 @@ private fun DropXApp(
             ?: NetworkManager.currentResult.unknownIp
 
         while (true) {
-            val freshNetData = NetworkManager.refreshNetworkData()
+            val freshNetData = withContext(Dispatchers.IO) { NetworkManager.refreshNetworkData() }
             val newEffectiveIp = selectedIp
                 ?: freshNetData.hotspotIp
                 ?: freshNetData.wifiIp
