@@ -71,6 +71,12 @@
 
     <string name="toast_resume_new_link">The network changed, so the link is different now</string>
 
+    <string name="action_clear_all">Clear all</string>
+    <string name="dialog_clear_title">Remove all files from the list?</string>
+    <string name="dialog_clear_message">This only clears dropX\'s list. Your files stay on your phone.</string>
+    <string name="action_clear_all_confirm">Remove all</string>
+    <string name="action_cancel">Cancel</string>
+
     <string name="toast_no_network">Connect to Wi-Fi or turn on your hotspot first</string>
     <string name="toast_files_skipped">%1$d file(s) skipped: size could not be read</string>
     <string name="cd_qr_code">QR code for the share link</string>

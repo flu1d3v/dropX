@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.sp
 import com.fluid.dropx.R
 import com.fluid.dropx.core.ThumbnailManager
 import com.fluid.dropx.model.FileMetadata
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 @Composable
 fun FilesScreen(
@@ -32,10 +35,13 @@ fun FilesScreen(
     shareUrl     : String?,
     onPickFiles  : () -> Unit,
     onRemoveFile : (String) -> Unit,
+    onClearAll   : () -> Unit,
 ) {
     val context = LocalContext.current
     // Remembers the instance across view recompositions so we don't dump and recreate the thumbnail caches
     val thumbManager = remember { ThumbnailManager.get(context) }
+
+    var confirmClear by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -74,14 +80,13 @@ fun FilesScreen(
             }
         }
 
-        // Sub-Header Count Banner Row (Appears exclusively when files are in the selection array)
+        // Sub-header: file count, "Live" badge while serving, and Clear all while stopped
         if (files.isNotEmpty()) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Formatted string resolution with plural handling mechanics
                 val displayCountText = if (files.size == 1) {
                     stringResource(R.string.files_count_singular)
                 } else {
@@ -94,7 +99,6 @@ fun FilesScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Live Stream Safety Badge Alert: Tells the user they cannot modify items while the server is hosting
                 if (serverRunning) {
                     Box(
                         modifier = Modifier
@@ -115,9 +119,22 @@ fun FilesScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                Spacer(Modifier.weight(1f))
+
+                if (!serverRunning) {
+                    TextButton(onClick = { confirmClear = true }) {
+                        Text(
+                            text = stringResource(R.string.action_clear_all),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(6.dp))
         }
+
 
         // Layout Routing State Switch
         if (files.isEmpty()) {
@@ -144,6 +161,29 @@ fun FilesScreen(
                     )
                 }
             }
+        }
+        if (confirmClear) {
+            AlertDialog(
+                onDismissRequest = { confirmClear = false },
+                title = { Text(stringResource(R.string.dialog_clear_title)) },
+                text = { Text(stringResource(R.string.dialog_clear_message)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmClear = false
+                        onClearAll()
+                    }) {
+                        Text(
+                            stringResource(R.string.action_clear_all_confirm),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmClear = false }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                }
+            )
         }
     }
 }

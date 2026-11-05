@@ -250,6 +250,10 @@ private fun DropXApp(
                     onRemoveFile = { id ->
                         FileRegistry.removeFile(id)
                         files = FileRegistry.getAllMetadata()
+                    },
+                    onClearAll = {
+                        FileRegistry.clear()
+                        files = FileRegistry.getAllMetadata()
                     }
                 )
             }
