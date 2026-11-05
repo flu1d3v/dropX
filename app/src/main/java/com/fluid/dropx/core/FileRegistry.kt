@@ -3,48 +3,48 @@ package com.fluid.dropx.core
 import android.net.Uri
 import com.fluid.dropx.model.FileMetadata
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
-// In-memory registry to map selected files to randomly generated UUIDs.
-// This completely hides real file paths/URIs from the network. The client only sees the random ID.
+// In-memory registry that maps selected files to random UUIDs.
+// The network only ever sees the random id, never the real file path/URI.
+// Files keep the order in which they were added.
 object FileRegistry {
-    // ConcurrentHashMaps ensure thread safety when multiple clients request metadata or stream files simultaneously
-    private val uriMap = ConcurrentHashMap<String, Uri>()
-    private val metadataMap = ConcurrentHashMap<String, FileMetadata>()
+    private val lock = Any()
+    private val metadataMap = LinkedHashMap<String, FileMetadata>()
+    private val uriMap = HashMap<String, Uri>()
 
     fun addFile(uri: Uri, name: String, size: Long, mime: String, lastModified: Long): String {
-        val secureId = UUID.randomUUID().toString()
-
+        val id = UUID.randomUUID().toString()
         val metadata = FileMetadata(
-            id = secureId,
+            id = id,
             name = name,
             size = size,
             mimeType = mime,
             lastModified = lastModified
         )
-
-        metadataMap[secureId]=metadata
-        uriMap[secureId]=uri
-
-        return secureId
+        synchronized(lock) {
+            metadataMap[id] = metadata
+            uriMap[id] = uri
+        }
+        return id
     }
 
     fun removeFile(id: String) {
-        metadataMap.remove(id)
-        uriMap.remove(id)
-    }
-
-    fun getUri(id: String): Uri? = uriMap[id]
-
-    // Using synchronized wrapper here to prevent ConcurrentModificationException when converting the map values to a flat list
-    fun getAllMetadata(): List<FileMetadata> {
-        synchronized(metadataMap) {
-            return metadataMap.values.toList()
+        synchronized(lock) {
+            metadataMap.remove(id)
+            uriMap.remove(id)
         }
     }
-    fun getMetadata(id: String): FileMetadata? = metadataMap[id]
+
+    fun getUri(id: String): Uri? = synchronized(lock) { uriMap[id] }
+
+    fun getMetadata(id: String): FileMetadata? = synchronized(lock) { metadataMap[id] }
+
+    fun getAllMetadata(): List<FileMetadata> = synchronized(lock) { metadataMap.values.toList() }
+
     fun clear() {
-        metadataMap.clear()
-        uriMap.clear()
+        synchronized(lock) {
+            metadataMap.clear()
+            uriMap.clear()
+        }
     }
 }
