@@ -2,12 +2,15 @@ package com.fluid.dropx
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -15,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -25,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.fluid.dropx.core.FileRegistry
 import com.fluid.dropx.core.SessionStore
 import com.fluid.dropx.core.TransferManager
@@ -33,7 +38,7 @@ import com.fluid.dropx.network.TransferService
 import com.fluid.dropx.ui.configure.ConfigureScreen
 import com.fluid.dropx.ui.configure.QrDialog
 import com.fluid.dropx.ui.files.FilesScreen
-import com.fluid.dropx.ui.theme.*
+import com.fluid.dropx.ui.theme.DropXTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -48,22 +53,31 @@ class MainActivity : ComponentActivity() {
     // Set when the user taps the "Sharing paused" notification
     private var resumeRequested by mutableStateOf(false)
 
-    // System Picker Contract: Launches the standard system media/document selection frame asynchronously
+    // True while the app is on screen; the status polling only runs then (saves battery)
+    private var appVisible by mutableStateOf(false)
+
+    // System file picker
     private val pickerLauncher =
         registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
             onPickResult?.invoke(uris)
         }
 
+    // Android 13+ notification permission (asked only if it isn't granted yet)
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* nothing to do */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Android 13 (API 33) and higher demands runtime clearance before posting notifications
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
         transferManager = TransferManager(this)
-        enableEdgeToEdge() // Injects content padding maps behind structural status bars
+        enableEdgeToEdge()
 
         resumeRequested = intent?.action == TransferService.ACTION_RESUME_SHARING
 
@@ -71,15 +85,26 @@ class MainActivity : ComponentActivity() {
             DropXTheme {
                 DropXApp(
                     transferManager = transferManager,
+                    visible = appVisible,
                     resumeRequested = resumeRequested,
                     onResumeHandled = { resumeRequested = false },
                     onRequestPick = { callback ->
                         onPickResult = callback
-                        pickerLauncher.launch("*/*") // Explicit wildcards accept any structural data asset format
+                        pickerLauncher.launch("*/*")
                     }
                 )
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        appVisible = true
+    }
+
+    override fun onStop() {
+        appVisible = false
+        super.onStop()
     }
 
     // The app is already open and the user taps the "Sharing paused" notification
@@ -95,6 +120,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun DropXApp(
     transferManager: TransferManager,
+    visible: Boolean,
     resumeRequested: Boolean,
     onResumeHandled: () -> Unit,
     onRequestPick: (callback: (List<android.net.Uri>) -> Unit) -> Unit
@@ -109,34 +135,17 @@ private fun DropXApp(
     var resumeTrigger by remember { mutableIntStateOf(0) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
+
     var pausedByLimit by remember { mutableStateOf(SessionStore.isPaused(context)) }
 
-    // Master State Loop: polls the real hardware/service layers every 2 seconds
-    // so the UI always matches the Ktor engine.
-    LaunchedEffect(Unit) {
-        var lastBoundIp: String? = selectedIp
-            ?: NetworkManager.currentResult.hotspotIp
-            ?: NetworkManager.currentResult.wifiIp
-            ?: NetworkManager.currentResult.unknownIp
-
+    // Status loop: mirrors the real network/service state into the UI every 2 seconds,
+    // but only while the app is visible. (Network-loss protection lives in the service itself.)
+    LaunchedEffect(visible) {
+        if (!visible) return@LaunchedEffect
         while (true) {
             val freshNetData = withContext(Dispatchers.IO) { NetworkManager.refreshNetworkData() }
-            val newEffectiveIp = selectedIp
-                ?: freshNetData.hotspotIp
-                ?: freshNetData.wifiIp
-                ?: freshNetData.unknownIp
-
             val isCurrentlyRunning = TransferService.isEngineRunning
-
-            // Network Drop Protection: if the phone hops network adapters mid-stream, stop the service
-            // instead of exposing the files on a different network.
-            if (isCurrentlyRunning && newEffectiveIp != lastBoundIp) {
-                TransferService.stop(context)
-                transferManager.stopTransferSession()
-                lastBoundIp = newEffectiveIp
-            } else if (!isCurrentlyRunning) {
-                lastBoundIp = newEffectiveIp
-            }
 
             netData       = freshNetData
             port          = TransferService.activePort
@@ -167,19 +176,22 @@ private fun DropXApp(
         val ip = selectedIp ?: fresh.hotspotIp ?: fresh.wifiIp ?: fresh.unknownIp
         if (ip != null) {
             TransferService.start(context, ip, saved.port, saved.sessionId)
+        } else {
+            Toast.makeText(context, R.string.toast_no_network, Toast.LENGTH_SHORT).show()
         }
     }
 
     val effectiveIp = selectedIp
         ?: netData.hotspotIp ?: netData.wifiIp ?: netData.unknownIp
 
-    // Dynamic Route URL Assembler
-    val shareUrl = if (running && port > 0 && effectiveIp != null && TransferService.currentSessionId != null) {
-        "http://$effectiveIp:$port/share/${TransferService.currentSessionId}"
+    // The link must use the IP the server is REALLY bound to, not the currently preferred one
+    val linkHost = TransferService.boundIp ?: effectiveIp
+    val shareUrl = if (running && port > 0 && linkHost != null && TransferService.currentSessionId != null) {
+        "http://$linkHost:$port/share/${TransferService.currentSessionId}"
     } else null
 
     Scaffold(
-        containerColor = BackgroundCanvas,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             DropXBottomBar(current = screen, onSelect = { screen = it })
         }
@@ -201,11 +213,10 @@ private fun DropXApp(
                             TransferService.stop(context)
                             transferManager.stopTransferSession()
                             files = FileRegistry.getAllMetadata()
+                        } else if (effectiveIp != null) {
+                            TransferService.start(context, effectiveIp)   // new session
                         } else {
-                            if (effectiveIp != null) {
-                                // Foreground initiation through the lifecycle controllers (new session)
-                                TransferService.start(context, effectiveIp)
-                            }
+                            Toast.makeText(context, R.string.toast_no_network, Toast.LENGTH_SHORT).show()
                         }
                     },
                     onShowQr = { showQr = true }
@@ -219,12 +230,19 @@ private fun DropXApp(
                             if (uris.isNotEmpty()) {
                                 // If the server is running, append to the live catalog without
                                 // knocking existing downloads offline.
-                                if (running) {
+                                val skipped = if (running) {
                                     transferManager.appendTransferSession(uris)
                                 } else {
                                     transferManager.startTransferSession(uris)
                                 }
                                 files = FileRegistry.getAllMetadata()
+                                if (skipped > 0) {
+                                    Toast.makeText(
+                                        context,
+                                        resources.getString(R.string.toast_files_skipped, skipped),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
                             }
                         }
                     },
@@ -242,13 +260,14 @@ private fun DropXApp(
     }
 }
 
-// Custom Navigation Bar for switching layout panels cleanly
+// Bottom navigation, fully driven by the theme so light and dark mode both look right
 @Composable
 private fun DropXBottomBar(current: Screen, onSelect: (Screen) -> Unit) {
+    val colors = MaterialTheme.colorScheme
     NavigationBar(
-        containerColor = SurfacePrimary,
+        containerColor = colors.surface,
         tonalElevation = 0.dp,
-        modifier = Modifier.border(androidx.compose.foundation.BorderStroke(1.dp, BorderHairline))
+        modifier = Modifier.border(BorderStroke(1.dp, colors.outline))
     ) {
         listOf(
             Triple(Screen.Configure, Icons.Default.Tune, stringResource(R.string.nav_tab_configure)),
@@ -260,11 +279,11 @@ private fun DropXBottomBar(current: Screen, onSelect: (Screen) -> Unit) {
                 icon = { Icon(iconVector, null) },
                 label = { Text(labelText, fontSize = 11.sp) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = BrandCharcoal,
-                    selectedTextColor = BrandCharcoal,
-                    indicatorColor = BrandContainer,
-                    unselectedIconColor = TextPrimary,
-                    unselectedTextColor = TextPrimary
+                    selectedIconColor = colors.primary,
+                    selectedTextColor = colors.primary,
+                    indicatorColor = colors.surfaceVariant,
+                    unselectedIconColor = colors.onSurfaceVariant,
+                    unselectedTextColor = colors.onSurfaceVariant
                 )
             )
         }

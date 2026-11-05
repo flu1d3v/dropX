@@ -38,21 +38,25 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicBoolean
 
 class TransferService : Service() {
-    // Isolated Coroutine Scope: Uses SupervisorJob so that if an individual network request
-    // or file stream crashes, the entire background engine doesn't fall over.
+    // Isolated scope: a crash in one request or stream never takes the whole engine down.
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val channelId = "transfer_service_channel"        // silent, ongoing "server is active"
-    private val alertChannelId = "transfer_alert_channel"      // audible, for "sharing paused"
+    private val alertChannelId = "transfer_alert_channel"      // audible alerts
     private val notificationId = 1001
     private val pausedNotificationId = 1002
+    private val networkLostNotificationId = 1003
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
@@ -62,12 +66,14 @@ class TransferService : Service() {
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
 
     // True from the moment a start is accepted until the engine is fully stopped.
-    // Prevents two quick start intents from booting two servers.
     private val engineRequested = AtomicBoolean(false)
+
+    // Watches that the IP we are bound to still exists (Wi-Fi/hotspot dropped or changed)
+    private var watchdogJob: Job? = null
 
     private val thumbnailManager by lazy { ThumbnailManager.get(applicationContext) }
 
-    // Caches the web portal's index.html frontend layout into memory so we aren't hammering disk I/O on every request
+    // Portal page cached in memory so we don't hit the disk on every request
     private val indexHtmlBytes by lazy {
         assets.open("index.html").use { it.readBytes() }
     }
@@ -80,13 +86,18 @@ class TransferService : Service() {
         const val EXTRA_PORT = "EXTRA_PORT"
         const val EXTRA_SESSION = "EXTRA_SESSION"
 
-        // Globally readable state flags for the UI layers (written from background threads -> @Volatile)
+        // State flags read by the UI (written from background threads, hence @Volatile)
         @Volatile
         var currentSessionId: String? = null
             private set
 
         @Volatile
         var activePort: Int = 0
+            private set
+
+        // The IP address the server is really bound to (the share link must use this one)
+        @Volatile
+        var boundIp: String? = null
             private set
 
         @Volatile
@@ -138,14 +149,16 @@ class TransferService : Service() {
                         startForeground(notificationId, notification)
                     }
                 } catch (e: Exception) {
-                    // e.g. Android 15 "time limit already exhausted for dataSync" when not visible.
-                    // Don't crash: just stop. The app UI will offer Resume.
+                    // e.g. Android 15 "dataSync time limit exhausted" while not visible. Don't crash.
                     stopSelf()
                     return START_NOT_STICKY
                 }
 
-                // The user is (re)starting: the "paused" alert is no longer relevant
-                getSystemService(NotificationManager::class.java)?.cancel(pausedNotificationId)
+                // The user is (re)starting: old alerts are no longer relevant
+                getSystemService(NotificationManager::class.java)?.apply {
+                    cancel(pausedNotificationId)
+                    cancel(networkLostNotificationId)
+                }
 
                 acquireHardwareLocks()
                 startServer(ip, wantedPort, wantedSession)
@@ -156,11 +169,9 @@ class TransferService : Service() {
 
     /**
      * Android 15+ (API 35): the dataSync time budget (about 6 h per 24 h in the background) is used up.
-     * The service has only a few seconds to call stopSelf(), otherwise the system throws
-     * "A foreground service of type dataSync did not stop within its timeout".
-     *
-     * So we: remember the session (so Resume restores the same link), tell the user, and stop right away.
-     * Real shutdown of the server happens in onDestroy().
+     * The service has only a few seconds to call stopSelf(), otherwise the system throws.
+     * We remember the session (so Resume restores the same link), tell the user, and stop right away.
+     * The real shutdown of the server happens in onDestroy().
      */
     override fun onTimeout(startId: Int, fgsType: Int) {
         val port = activePort
@@ -178,25 +189,27 @@ class TransferService : Service() {
     private fun createNotificationChannels() {
         val manager = getSystemService(NotificationManager::class.java) ?: return
 
-        val ongoing = NotificationChannel(
-            channelId,
-            getString(R.string.notification_channel_name),
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = getString(R.string.notification_channel_description)
-            setShowBadge(false)
-        }
-        manager.createNotificationChannel(ongoing)
+        manager.createNotificationChannel(
+            NotificationChannel(
+                channelId,
+                getString(R.string.notification_channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = getString(R.string.notification_channel_description)
+                setShowBadge(false)
+            }
+        )
 
-        val alerts = NotificationChannel(
-            alertChannelId,
-            getString(R.string.notification_alert_channel_name),
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = getString(R.string.notification_alert_channel_description)
-            setShowBadge(false)
-        }
-        manager.createNotificationChannel(alerts)
+        manager.createNotificationChannel(
+            NotificationChannel(
+                alertChannelId,
+                getString(R.string.notification_alert_channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = getString(R.string.notification_alert_channel_description)
+                setShowBadge(false)
+            }
+        )
     }
 
     private fun createNotification(): android.app.Notification {
@@ -206,23 +219,14 @@ class TransferService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // Tapping the notification body opens the app
-        val openIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val openPendingIntent = PendingIntent.getActivity(
-            this, 1, openIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(getString(R.string.notification_content))
             .setSmallIcon(R.drawable.ic_dropx_share)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setContentIntent(openPendingIntent)
-            .setOngoing(true) // Blocks the user from swiping the notification away while transfers are alive
+            .setContentIntent(openAppPendingIntent(1))
+            .setOngoing(true)
             .addAction(
                 R.drawable.ic_dropx_share_off,
                 getString(R.string.notification_action_stop),
@@ -231,20 +235,20 @@ class TransferService : Service() {
             .build()
     }
 
-    // "Sharing paused" alert. Tapping it opens the app with ACTION_RESUME_SHARING; because the user
-    // brings the app to the foreground, Android resets the dataSync timer and we may start again.
-    private fun postPausedNotification() {
-        val resumeIntent = Intent(this, MainActivity::class.java).apply {
-            action = ACTION_RESUME_SHARING
+    private fun openAppPendingIntent(requestCode: Int, action: String? = null): PendingIntent {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            if (action != null) this.action = action
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 2, resumeIntent,
+        return PendingIntent.getActivity(
+            this, requestCode, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val text = getString(R.string.notification_paused_text)
+    }
+
+    private fun postAlert(id: Int, title: String, text: String, pendingIntent: PendingIntent) {
         val notification = NotificationCompat.Builder(this, alertChannelId)
-            .setContentTitle(getString(R.string.notification_paused_title))
+            .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setSmallIcon(R.drawable.ic_dropx_share_off)
@@ -253,10 +257,35 @@ class TransferService : Service() {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
-        getSystemService(NotificationManager::class.java)?.notify(pausedNotificationId, notification)
+        getSystemService(NotificationManager::class.java)?.notify(id, notification)
     }
 
-    private fun newSessionId(): String = java.util.UUID.randomUUID().toString().take(6)
+    // Tapping it opens the app with ACTION_RESUME_SHARING; the user bringing the app to the
+    // foreground resets Android's dataSync timer, so we may start again.
+    private fun postPausedNotification() {
+        postAlert(
+            pausedNotificationId,
+            getString(R.string.notification_paused_title),
+            getString(R.string.notification_paused_text),
+            openAppPendingIntent(2, ACTION_RESUME_SHARING)
+        )
+    }
+
+    private fun postNetworkLostNotification() {
+        postAlert(
+            networkLostNotificationId,
+            getString(R.string.notification_network_lost_title),
+            getString(R.string.notification_network_lost_text),
+            openAppPendingIntent(3)
+        )
+    }
+
+    // 64 random bits = 16 hex characters; infeasible to guess by scanning the local network
+    private fun newSessionId(): String {
+        val bytes = ByteArray(8)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
 
     private fun startServer(hostIp: String, wantedPort: Int, wantedSession: String?) {
         // Already running or a start is already in progress -> ignore duplicate requests
@@ -274,12 +303,12 @@ class TransferService : Service() {
                 // Resume keeps the old session code so existing links keep working
                 val sessionId = wantedSession ?: newSessionId()
                 currentSessionId = sessionId
+                boundIp = hostIp
 
                 val engine = embeddedServer(CIO, port = activePort, host = hostIp) {
-                    // Installs essential Ktor features for streaming large chunks and files
-                    install(PartialContent)      // Handles pause/resume and partial chunks for fast seeking (vital for videos)
-                    install(AutoHeadResponse)    // Instantly handles basic browser pre-flight validation checks
-                    install(ConditionalHeaders)  // Leverages browser caching mechanics
+                    install(PartialContent)      // Range requests: pause/resume and instant seeking
+                    install(AutoHeadResponse)    // Answers HEAD requests automatically
+                    install(ConditionalHeaders)  // Browser caching headers
                     install(ContentNegotiation) {
                         json(Json {
                             prettyPrint = true
@@ -288,9 +317,9 @@ class TransferService : Service() {
                     }
 
                     routing {
-                        // All communication endpoints hide behind the dynamic randomized session id sub-path
+                        // Every endpoint hides behind the random session code
                         route("/share/$sessionId") {
-                            // Route: Serves the web browser portal interface
+                            // Web portal page
                             get {
                                 try {
                                     call.respondBytes(indexHtmlBytes, ContentType.Text.Html)
@@ -299,13 +328,12 @@ class TransferService : Service() {
                                 }
                             }
 
-                            // Route: Delivers the entire payload file metadata catalog as JSON
+                            // File catalog as JSON
                             get("/api/files") {
-                                val allFiles = FileRegistry.getAllMetadata()
-                                call.respond(allFiles)
+                                call.respond(FileRegistry.getAllMetadata())
                             }
 
-                            // Route: Streams requested image/media thumbnails safely from your manager's cache layers
+                            // Thumbnails (memory + disk cached)
                             get("/preview/{fileId}") {
                                 val id = call.parameters["fileId"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                                 val metadata = FileRegistry.getMetadata(id) ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -314,14 +342,13 @@ class TransferService : Service() {
                                 val thumbBytes = thumbnailManager.getThumbnail(metadata.name, uri, metadata.size, metadata.lastModified)
 
                                 if (thumbBytes != null) {
-                                    // Instructs the remote browser to cache the thumbnail image locally for exactly 24 hours
                                     call.response.header(HttpHeaders.CacheControl, "public, max-age=86400")
                                     return@get call.respondBytes(thumbBytes, ContentType.Image.JPEG)
                                 }
                                 call.respond(HttpStatusCode.NoContent)
                             }
 
-                            // Route: Stream-optimised pipeline for downloading the raw files (supports instant seeking)
+                            // Raw files: streamed from storage with real random access (instant seeking)
                             get("/file/{fileId}") {
                                 val id = call.parameters["fileId"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                                 val metadata = FileRegistry.getMetadata(id)
@@ -331,11 +358,10 @@ class TransferService : Service() {
                                     return@get call.respond(HttpStatusCode.NotFound)
                                 }
 
-                                // Safe MIME parsing: a weird mime string must not crash the request
                                 val type = runCatching { ContentType.parse(metadata.mimeType) }
                                     .getOrDefault(ContentType.Application.OctetStream)
 
-                                // ?download=1  -> force "Save as";  otherwise inline (video/audio/pdf preview)
+                                // ?download=1 forces "Save as"; otherwise inline (video/audio/pdf preview)
                                 val asAttachment = call.request.queryParameters["download"] == "1"
                                 call.response.header(HttpHeaders.ContentDisposition, contentDisposition(metadata.name, asAttachment))
 
@@ -346,11 +372,12 @@ class TransferService : Service() {
                 }
 
                 server = engine
-                engine.start(wait = false)   // Boot the server asynchronously without freezing the execution block
+                engine.start(wait = false)
                 isEngineRunning = true       // only flip AFTER start() succeeded
 
                 // A fresh/resumed session is live, so any remembered "paused" state is obsolete
                 SessionStore.clear(applicationContext)
+                startNetworkWatchdog(hostIp)
 
             } catch (e: Exception) {
                 runCatching { server?.stop(0, 500) }
@@ -358,6 +385,7 @@ class TransferService : Service() {
                 isEngineRunning = false
                 activePort = 0
                 currentSessionId = null
+                boundIp = null
                 engineRequested.set(false)
                 releaseHardwareLocks()
                 stopSelf()
@@ -365,33 +393,57 @@ class TransferService : Service() {
         }
     }
 
+    // If the IP we are bound to disappears (Wi-Fi lost, hotspot turned off, network switched) for two
+    // checks in a row, stop sharing and tell the user. Runs inside the service, so it also works
+    // when the app screen is closed. Files stay selected; only the server stops.
+    private fun startNetworkWatchdog(hostIp: String) {
+        watchdogJob?.cancel()
+        if (hostIp == "0.0.0.0") return
+        watchdogJob = serviceScope.launch {
+            var misses = 0
+            while (isActive) {
+                delay(3000)
+                val result = NetworkManager.refreshNetworkData()
+                val ips = listOfNotNull(result.hotspotIp, result.wifiIp, result.unknownIp)
+                misses = if (hostIp in ips) 0 else misses + 1
+                if (misses >= 2) {
+                    postNetworkLostNotification()
+                    stopServerGracefully()
+                    break
+                }
+            }
+        }
+    }
+
     /** Stops the Ktor engine and resets all state. Safe to call more than once. */
     private fun stopEngineNow(graceMs: Long, timeoutMs: Long) {
+        watchdogJob?.cancel()
+        watchdogJob = null
         val s = server
         server = null
         runCatching { s?.stop(graceMs, timeoutMs) }
         activePort = 0
         currentSessionId = null
+        boundIp = null
         isEngineRunning = false
         engineRequested.set(false)
         releaseHardwareLocks()
     }
 
-    // User pressed Stop (app button or notification action): forget any paused session and shut down.
+    // Stop requested (app button, notification action, or network lost): forget any paused session.
     private fun stopServerGracefully() {
         SessionStore.clear(this)
         getSystemService(NotificationManager::class.java)?.cancel(pausedNotificationId)
 
         serviceScope.launch {
-            // Gives active connections a short moment to wrap up before closing sockets
-            stopEngineNow(1000, 2000)
+            stopEngineNow(1000, 2000)   // short moment for active connections to wrap up
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
 
-    // Hardware locks: keep CPU and Wi-Fi radio active while serving. The OS releases both automatically
-    // if the process dies, and we release them explicitly on every normal stop path.
+    // Keep CPU and Wi-Fi radio active while serving. The OS releases both automatically if the
+    // process dies, and we release them explicitly on every normal stop path.
     private fun acquireHardwareLocks() {
         if (locksHeld) return
 
@@ -421,7 +473,7 @@ class TransferService : Service() {
     }
 
     override fun onDestroy() {
-        // Short grace: onDestroy runs on the main thread, so don't block it for long
+        // onDestroy runs on the main thread, so keep the grace period short
         stopEngineNow(200, 800)
         serviceScope.cancel()
         super.onDestroy()
