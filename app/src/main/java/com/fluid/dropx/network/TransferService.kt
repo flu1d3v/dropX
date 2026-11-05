@@ -174,10 +174,11 @@ class TransferService : Service() {
      * The real shutdown of the server happens in onDestroy().
      */
     override fun onTimeout(startId: Int, fgsType: Int) {
+        val ip = boundIp
         val port = activePort
         val session = currentSessionId
-        if (port > 0 && session != null) {
-            SessionStore.savePaused(this, port, session)
+        if (ip != null && port > 0 && session != null) {
+            SessionStore.savePaused(this, ip, port, session)
             postPausedNotification()
         }
         stopForeground(STOP_FOREGROUND_REMOVE)

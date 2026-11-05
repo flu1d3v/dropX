@@ -15,6 +15,8 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * One shared instance for the whole app (service + UI), obtained with [ThumbnailManager.get].
@@ -63,7 +65,11 @@ class ThumbnailManager private constructor(private val context: Context) {
         }
     }
 
-    suspend fun getThumbnail(name: String, uri: android.net.Uri, size: Long, lastModified: Long): ByteArray? {
+    // Always runs on the IO pool so blocking decode/disk work never ties up Ktor's request threads
+    suspend fun getThumbnail(name: String, uri: android.net.Uri, size: Long, lastModified: Long): ByteArray? =
+        withContext(Dispatchers.IO) { loadOrGenerate(name, uri, size, lastModified) }
+
+    private suspend fun loadOrGenerate(name: String, uri: android.net.Uri, size: Long, lastModified: Long): ByteArray? {
         val hash = CacheKeyGenerator.generate(name, size, lastModified)
 
         // 1. Fast path: memory cache

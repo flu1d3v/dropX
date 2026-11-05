@@ -35,6 +35,7 @@ object FileRegistry {
         }
     }
 
+    fun hasUri(uri: Uri): Boolean = synchronized(lock) { uriMap.containsValue(uri) }
     fun getUri(id: String): Uri? = synchronized(lock) { uriMap[id] }
 
     fun getMetadata(id: String): FileMetadata? = synchronized(lock) { metadataMap[id] }
