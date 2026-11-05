@@ -112,7 +112,7 @@ fun FilesScreen(
                     Text(
                         text = stringResource(R.string.server_running_hint),
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

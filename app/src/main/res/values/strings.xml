@@ -9,7 +9,6 @@
     <string name="notification_action_stop">Stop Server</string>
 
     <string name="error_portal_unavailable">Portal Unavailable</string>
-    <string name="error_stream_unavailable">Stream unavailable</string>
 
     <string name="files_header_title">Shared Files</string>
     <string name="action_add_files">Add Files</string>
@@ -25,7 +24,6 @@
     <string name="error_unsupported_type">Cannot process this file type</string>
 
     <string name="configure_header_title">dropX</string>
-    <string name="action_refresh">Refresh</string>
 
     <string name="banner_server_running">Server is running — stop it to change settings</string>
 
@@ -52,8 +50,6 @@
     <string name="dialog_title">Scan to Open</string>
     <string name="action_close">Close</string>
 
-    <string name="splash_brand_title">dropX</string>
-
     <string name="nav_tab_configure">Configure</string>
     <string name="nav_tab_files">Files</string>
 
@@ -72,4 +68,10 @@
     <string name="notification_paused_text">Android limits long background transfers to about 6 hours. Tap to resume with the same link.</string>
     <string name="banner_paused_by_limit">Sharing was paused by Android\'s background limit.</string>
     <string name="action_resume">Resume</string>
+
+    <string name="toast_no_network">Connect to Wi-Fi or turn on your hotspot first</string>
+    <string name="toast_files_skipped">%1$d file(s) skipped: size could not be read</string>
+    <string name="cd_qr_code">QR code for the share link</string>
+    <string name="notification_network_lost_title">Sharing stopped</string>
+    <string name="notification_network_lost_text">The network changed, so dropX stopped sharing. Open the app and start again to get a new link.</string>
 </resources>

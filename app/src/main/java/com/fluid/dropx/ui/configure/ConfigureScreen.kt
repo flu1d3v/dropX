@@ -173,9 +173,9 @@ fun ConfigureScreen(
                             .padding(horizontal = 16.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(stringResource(R.string.table_header_network),    fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(1.2f))
-                        Text(stringResource(R.string.table_header_ip), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(2f))
-                        Text(stringResource(R.string.table_header_use),        fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.End, modifier = Modifier.width(44.dp))
+                        Text(stringResource(R.string.table_header_network),    fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1.2f))
+                        Text(stringResource(R.string.table_header_ip), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(2f))
+                        Text(stringResource(R.string.table_header_use),        fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, modifier = Modifier.width(44.dp))
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
@@ -215,7 +215,7 @@ fun ConfigureScreen(
                             Text(
                                 label,
                                 fontSize = 13.sp,
-                                color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                                color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                 modifier = Modifier.weight(1.2f)
                             )
                             Text(
@@ -371,7 +371,7 @@ fun QrDialog(url: String, onDismiss: () -> Unit) {
                 Text(stringResource(R.string.dialog_title), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 if (qr != null) {
                     Image(
-                        bitmap = qr.asImageBitmap(), contentDescription = null,
+                        bitmap = qr.asImageBitmap(), contentDescription = stringResource(R.string.cd_qr_code),
                         modifier = Modifier.size(220.dp).clip(RoundedCornerShape(10.dp))
                     )
                 }
