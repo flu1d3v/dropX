@@ -646,10 +646,10 @@
         if (g === 'image') {
             body.innerHTML = `<img src="${fileUrl(f.id)}" alt="${esc(f.name)}" onerror="showNoPreview(this)">`;
         } else if (g === 'video') {
-            body.innerHTML = `<video controls autoplay preload="metadata"><source src="${fileUrl(f.id)}" type="${esc(f.mimeType)}"></video>`;
+            body.innerHTML = `<video controls autoplay preload="metadata" src="${fileUrl(f.id)}" onerror="mediaFailed()"></video>`;
             sw.style.display = ''; document.getElementById('ovStream').onclick = () => window.open(fileUrl(f.id), '_blank');
         } else if (g === 'audio') {
-            body.innerHTML = `<audio controls autoplay><source src="${fileUrl(f.id)}" type="${esc(f.mimeType)}"></audio>`;
+            body.innerHTML = `<audio controls autoplay src="${fileUrl(f.id)}" onerror="mediaFailed()"></audio>`;
             sw.style.display = ''; document.getElementById('ovStream').onclick = () => window.open(fileUrl(f.id), '_blank');
         } else if (g === 'pdf') {
             body.innerHTML = `<iframe src="${fileUrl(f.id)}#toolbar=1" title="${esc(f.name)}"></iframe>`;
@@ -671,6 +671,18 @@
     }
 
     function showNoPreview(img) { img.parentElement.innerHTML = noPreviewHtml(); }
+
+    // The browser cannot decode this format: point the user to a media player instead
+    function mediaFailed() {
+        const f = filtered[ovIndex];
+        if (!f) return;
+        document.getElementById('ovBody').innerHTML = `
+            <div class="no-preview">
+                ${mimeIconSvg(f.mimeType, 56)}
+                <p>This browser can't play this format.<br>Copy the link and open it in VLC or MX Player.</p>
+                <button class="btn btn-primary btn-sm" onclick="copyLink(filtered[${ovIndex}])">Copy link</button>
+            </div>`;
+    }
 
     function ovClose(e) {
         if (e && e.target !== document.getElementById('overlay')) return;
