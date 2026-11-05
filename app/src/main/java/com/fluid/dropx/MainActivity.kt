@@ -173,9 +173,16 @@ private fun DropXApp(
         if (TransferService.isEngineRunning) return@LaunchedEffect
 
         val fresh = withContext(Dispatchers.IO) { NetworkManager.refreshNetworkData() }
-        val ip = selectedIp ?: fresh.hotspotIp ?: fresh.wifiIp ?: fresh.unknownIp
+        val currentIps = listOfNotNull(fresh.hotspotIp, fresh.wifiIp, fresh.unknownIp)
+        // Same link only works if the original IP still exists on this phone.
+        // Otherwise fall back to the preferred IP (the link then necessarily changes).
+        val ip = if (saved.ip in currentIps) saved.ip
+        else selectedIp ?: fresh.hotspotIp ?: fresh.wifiIp ?: fresh.unknownIp
         if (ip != null) {
             TransferService.start(context, ip, saved.port, saved.sessionId)
+            if (ip != saved.ip) {
+                Toast.makeText(context, R.string.toast_resume_new_link, Toast.LENGTH_LONG).show()
+            }
         } else {
             Toast.makeText(context, R.string.toast_no_network, Toast.LENGTH_SHORT).show()
         }
@@ -210,9 +217,7 @@ private fun DropXApp(
                     onSelectIp = { ip -> if (!running) selectedIp = if (selectedIp == ip) null else ip },
                     onStartStop = {
                         if (running) {
-                            TransferService.stop(context)
-                            transferManager.stopTransferSession()
-                            files = FileRegistry.getAllMetadata()
+                            TransferService.stop(context)   // files stay selected; remove them individually when stopped
                         } else if (effectiveIp != null) {
                             TransferService.start(context, effectiveIp)   // new session
                         } else {
@@ -230,11 +235,7 @@ private fun DropXApp(
                             if (uris.isNotEmpty()) {
                                 // If the server is running, append to the live catalog without
                                 // knocking existing downloads offline.
-                                val skipped = if (running) {
-                                    transferManager.appendTransferSession(uris)
-                                } else {
-                                    transferManager.startTransferSession(uris)
-                                }
+                                val skipped = transferManager.appendTransferSession(uris)
                                 files = FileRegistry.getAllMetadata()
                                 if (skipped > 0) {
                                     Toast.makeText(

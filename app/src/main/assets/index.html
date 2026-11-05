@@ -429,7 +429,7 @@
         </div>
         <div class="ov-body" id="ovBody"></div>
         <div class="ov-foot">
-            <button class="btn btn-ghost btn-sm" id="ovCopy" title="Copy direct link (paste into VLC, MX Player…)">
+            <button class="btn btn-ghost btn-sm" id="ovCopy" title="Copy direct link to play in an external media player (such as VLC)">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
                 Copy link
             </button>
@@ -679,7 +679,7 @@
         document.getElementById('ovBody').innerHTML = `
             <div class="no-preview">
                 ${mimeIconSvg(f.mimeType, 56)}
-                <p>This browser can't play this format.<br>Copy the link and open it in VLC or MX Player.</p>
+                <p>This browser can't play this format.<br>Copy the link and open it in an external media player (such as VLC).</p>
                 <button class="btn btn-primary btn-sm" onclick="copyLink(filtered[${ovIndex}])">Copy link</button>
             </div>`;
     }
