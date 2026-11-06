@@ -19,14 +19,14 @@ plugins {
 
 android {
     namespace = "com.fluid.dropx"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.fluid.dropx"
         minSdk = 29 // Crucial baseline: Dropping below API 29 breaks ThumbnailManager's loadThumbnail() calls
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -34,7 +34,6 @@ android {
     buildTypes {
         release {
             // Optimization Engine: R8 minification strips dead code, renames long paths, and packs
-            // resource assets tightly to reach that insanely optimized 4.89 MB compile footprint.
             isMinifyEnabled = true
             isShrinkResources = true
 
@@ -95,5 +94,3 @@ dependencyCheck {
     }
     suppressionFile = "project-suppressions.xml" // Ignores known non-applicable false-positives
 }
-
-tasks.named("cyclonedxBom")
