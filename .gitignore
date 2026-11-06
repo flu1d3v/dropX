@@ -44,3 +44,9 @@ captures/
 # Build Release Artifacts Isolation
 app/release/
 release/
+
+# Signing keys and release bundles (NEVER commit)
+*.jks
+*.keystore
+keystore.properties
+*.aab
