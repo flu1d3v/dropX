@@ -29,3 +29,8 @@ A proper fix needs a custom first-trust mechanism that works entirely within a p
 
 * Upload from receiver to phone
 * SHA-256 checksum response headers for file integrity verification
+
+## Commit messages
+
+Use the form `type(scope): short description`, for example `fix(network): use bound ip for share link`.
+Common types: feat, fix, docs, chore, refactor, perf.
