@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    # One pull request per family instead of one per library
+    groups:
+      ktor:
+        patterns:
+          - "io.ktor:*"
+      androidx:
+        patterns:
+          - "androidx.*"
+    # Skip major version jumps
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
