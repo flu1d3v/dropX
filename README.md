@@ -1,161 +1,157 @@
 # dropX
 
-Share files from your Android phone over your local network. The receiver opens a browser — nothing to install on their end, no account, no cloud, no middleman.
+Share files from your Android phone to any device on the same Wi-Fi network or hotspot. The other person opens a link in a browser. They don't need an app or an account, and nothing is uploaded anywhere.
 
-Lightweight. No ads. No tracking. Everything stays on your network.
+No ads, no tracking, no account.
 
 ---
 
 ## Screenshots
 
 | Configure | Server Running | QR Code | Files |
-|:---:|:---:|:---:|:---:|
-| ![](docs/screenshots/1.dropX_app_configure_screen.jpeg) | ![](docs/screenshots/2.dropX_app_start_server.jpeg) | ![](docs/screenshots/3.dropX_app_share_qr.jpeg) | ![](docs/screenshots/4.dropX_app_files_screen.jpeg) |
+| --- | --- | --- | --- |
+| [![](docs/screenshots/1.dropX_app_configure_screen.jpeg)](docs/screenshots/1.dropX_app_configure_screen.jpeg) | [![](docs/screenshots/2.dropX_app_start_server.jpeg)](docs/screenshots/2.dropX_app_start_server.jpeg) | [![](docs/screenshots/3.dropX_app_share_qr.jpeg)](docs/screenshots/3.dropX_app_share_qr.jpeg) | [![](docs/screenshots/4.dropX_app_files_screen.jpeg)](docs/screenshots/4.dropX_app_files_screen.jpeg) |
 
 | Web Portal Main | Web Portal Directory | Image Preview | Video Player Stream |
-|:---:|:---:|:---:|:---:|
-| ![](docs/screenshots/5.dropX_web.png) | ![](docs/screenshots/6.dropX_web_all_files.png) | ![](docs/screenshots/7.dropX_web_image_stream.png) | ![](docs/screenshots/8.dropX_web_video_stream.png) |
+| --- | --- | --- | --- |
+| [![](docs/screenshots/5.dropX_web.png)](docs/screenshots/5.dropX_web.png) | [![](docs/screenshots/6.dropX_web_all_files.png)](docs/screenshots/6.dropX_web_all_files.png) | [![](docs/screenshots/7.dropX_web_image_stream.png)](docs/screenshots/7.dropX_web_image_stream.png) | [![](docs/screenshots/8.dropX_web_video_stream.png)](docs/screenshots/8.dropX_web_video_stream.png) |
 
 | Stream Setup (VLC) | Live VLC Network Playback |
-|:---:|:---:|
-| ![](docs/screenshots/9.dropX_vlc_network_stream.png) | ![](docs/screenshots/10.dropX_vlc_network_stream2.png) |
+| --- | --- |
+| [![](docs/screenshots/9.dropX_vlc_network_stream.png)](docs/screenshots/9.dropX_vlc_network_stream.png) | [![](docs/screenshots/10.dropX_vlc_network_stream2.png)](docs/screenshots/10.dropX_vlc_network_stream2.png) |
 
 ---
 
-## The core idea
+## How it works
 
-Most file sharing tools either require both people to have an app, upload your files to someone's server, or make you jump through pairing screens. dropX skips all of that.
+You pick files in the app and tap **Start Server**. The app shows a link and a QR code. Open the link in any browser on the same network and you get a page where you can view, stream or download the files.
 
-You pick files, hit start, share a link or QR code. They open it in Chrome, Safari, Firefox — whatever. Done.
-
-The files never leave your network. No upload step. The phone itself is the server.
+The phone is the server. Files are read from where they already are on the phone and sent straight to the other device. Nothing is copied, and nothing goes through the internet.
 
 ---
 
-## Streaming — not just downloading
+## Install
 
-This is the part that separates dropX from most tools in this category.
+Download the APK from the [Releases](https://github.com/flu1d3v/dropX/releases) page. It needs Android 10 or newer on the phone that shares the files. The device that opens the link can be anything with a browser.
 
-The server implements HTTP range requests (partial content). This means:
+---
 
-**In the browser** — videos and audio play directly without downloading the full file first. You can scrub to any point in a video instantly. A 2GB movie works the same as a 10MB clip.
+## Streaming and downloads
 
-**In external players over the network** — because dropX serves standard HTTP with range support, you can paste the direct file URL into any player that supports network streams. VLC, MX Player, IINA, mpv — open network stream, paste the URL, done. The file plays from your phone in real time with full seek support.
+**In the browser.** Videos and audio play in the page if your browser supports the format. Browsers can't play every format, and MKV and HEVC are common problems. If a file won't play, use **Copy link** and open the link in a media player instead.
 
-The direct file URL format is:
+**In a media player.** The server supports HTTP range requests, so any player that can open a network stream can play a file directly from the phone, with seeking. VLC, MX Player, mpv and IINA all work this way. The URL looks like this:
 
 ```
 http://<your-ip>:<port>/share/<session-id>/file/<file-id>
-
 ```
 
-You get this from the web portal. Any player that can open an HTTP URL will work.
+You can copy it from the three-dot menu on a file in the app, or from the **Copy link** button in the web portal.
 
-**Downloads** — if someone does want to save the file, the web portal handles it with a streaming download that shows real progress. Resumable if the connection drops mid-transfer.
+**Seeking.** Range requests mean that jumping to any point in a file does not read the file from the start. This was tested with a 2 GB+ 1080p movie over Wi-Fi with no noticeable delay.
+
+**Downloads.** A download is handed to the browser's own download manager, so the file goes straight to disk and the page doesn't hold it in memory. Browsers can usually resume an interrupted download.
 
 ---
 
 ## Web portal
 
-The receiver gets a full file browser in their browser tab. Not a plain directory listing — an actual UI.
+The receiver gets a file browser in the browser tab.
 
-* Grid and list view toggle
-* Filter by file type — images, video, audio, PDF, other
-* Search across file names
-* Thumbnail previews for images and video
-* Click any file to preview it inline — images, video with controls, audio player, PDF viewer
-* Navigate between files with arrow keys
-* Select multiple files and batch download
-* QR code on the sender side for quick sharing to phones
+- Grid and list view
+- Filter by type: images, video, audio, PDF, other
+- Search by file name
+- Thumbnails for images and video
+- Preview in the page: images, video, audio and PDF
+- Arrow keys move between files
+- Select several files and download them together
+- Copy link on each file
 
-The whole portal is a single HTML file bundled inside the APK. No CDN calls for the UI itself, fonts aside.
+The whole portal is one HTML file inside the APK. It makes no requests to outside servers.
+
+---
+
+## Wi-Fi and hotspot
+
+dropX lists the Wi-Fi and hotspot addresses separately. This matters because a common case is sharing with the person next to you by turning on your hotspot.
+
+It reads the network interface names (`ap*`, `swlan*`, `softap*` for hotspot, `wlan*` for Wi-Fi) and shows what is available. If both are up, you choose which one to use. Phone makers don't all name interfaces the same way. If your hotspot address doesn't show up, please open an issue and include the output of `ip addr`.
+
+---
+
+## Running in the background
+
+The server runs in a foreground service with a notification and a Stop button. A wake lock and a Wi-Fi lock are held while it runs, so it keeps working when the screen turns off.
+
+- If the Wi-Fi or hotspot address disappears, dropX stops sharing and shows a notification. Your file list stays.
+- Android 15 and newer limit this kind of background service to about 6 hours. When that happens, dropX stops cleanly and shows a notification. Tap it to resume with the same port and the same link.
 
 ---
 
 ## How the server works
 
-The app runs an embedded Ktor CIO HTTP server inside a foreground service. CIO is non-blocking — multiple receivers downloading different files simultaneously don't block each other.
-
-Wake lock and WiFi lock are held for the duration of the session so the server doesn't die when the screen turns off.
-
-Files are served directly from their original content URIs through Android's ContentResolver. Nothing is copied or moved — the file stays exactly where it is on the device.
-
-Each session gets a random ID that becomes part of every URL. Without that ID, you can't enumerate files or access anything on the server. It's not authentication but it's not nothing either.
-
-Thumbnails are generated on demand and cached — LRU memory cache backed by a disk cache with a 50MB quota and automatic pruning. Concurrent thumbnail generation is limited to 3 at a time so it doesn't hammer the device.
+- Ktor CIO HTTP server inside a foreground service. CIO is non-blocking, so several receivers can download different files at the same time.
+- Files are served through Android's ContentResolver from their original location. Range requests jump to the right offset in the file instead of reading from the start.
+- Each session gets a random 16-character ID (64 random bits) that is part of every URL.
+- Thumbnails are made on demand and cached: an LRU memory cache backed by a disk cache with a 50 MB limit and automatic pruning. At most 3 thumbnails are generated at the same time.
 
 ---
 
-## Hotspot support
+## Security
 
-dropX explicitly detects hotspot IP addresses separately from WiFi. This matters because the most common use case — "I want to share something with the person next to me right now" — usually means turning on your hotspot, not finding a shared router.
+dropX is built for a local network, and its security model follows from that.
 
-The network detection reads actual interface names (`ap*`, `swlan*`, `softap*` for hotspot, `wlan*` for WiFi) and surfaces whichever is available. If both are up, you can pick which one to bind to.
+- **HTTP, not HTTPS.** A self-signed certificate would show a browser warning that most people can't get past, which defeats the point of sharing without setup. Use trusted networks.
+- **No login.** Anyone on the network who has the link can open the files until you stop the server. The 16-character session ID stops people from guessing links. It is not authentication.
+- **Read-only.** Receivers can only download. There is no upload endpoint.
+- **Nothing leaves the phone.** No telemetry, analytics, crash reporting or ads.
+
+The full threat model is in [THREAT_MODEL.md](THREAT_MODEL.md). The privacy policy is in [PRIVACY.md](PRIVACY.md).
 
 ---
 
 ## Tech stack
 
-* Kotlin + Jetpack Compose
-* Ktor CIO — embedded HTTP server with partial content, conditional headers, auto head response
-* Kotlinx Serialization — file metadata served as JSON to the web portal
-* ZXing — QR code generation
-* Android ContentResolver + DocumentFile for file access and metadata
-* Custom thumbnail pipeline — no Glide, no Coil, hand-rolled LRU + disk cache with quota management
-* Material3 with full dark mode support
-
----
-
-## Security model
-
-This is a local network tool and the security model reflects that. Honest about the tradeoffs:
-
-**HTTP not HTTPS** — the receiver would get a self-signed cert warning in their browser that most people don't know how to bypass. That friction defeats the purpose of zero-install sharing. HTTP on a local network is an accepted tradeoff.
-
-**Session ID is 6 characters** — this is not a strong secret. On a local network it's theoretically brute-forceable. For the use case (quick sharing to someone you're physically near) it's sufficient. It prevents casual stumbling, not a determined attacker on the same network.
-
-**No authentication** — anyone with the URL can access the files for the duration of the session. Stopping the server ends the session and clears everything.
-
-**Read-only** — receivers can only download. There is no upload endpoint. The server exposes no write surface.
-
-**Nothing leaves the device** — no telemetry, no analytics, no crash reporting, no ads SDK, nothing phoning home.
-
-**Full threat model and security pipeline** documented in [THREAT_MODEL.md](THREAT_MODEL.md).
+- Kotlin, Jetpack Compose, Material 3 (light and dark theme)
+- Ktor CIO server with partial content and auto HEAD response
+- kotlinx.serialization for the file list sent to the portal
+- ZXing for QR codes
+- ContentResolver and DocumentFile for file access
+- Thumbnail pipeline written for this app: no Glide or Coil
 
 ---
 
 ## Building
 
-```bash
+```
 git clone https://github.com/flu1d3v/dropX.git
-
 ```
 
-Open in Android Studio. No API keys or external config needed to build and run.
+Open the project in Android Studio. No API keys or other setup are needed to build and run.
 
 ```
 Min SDK:    29  (Android 10)
 Target SDK: 36
 Language:   Kotlin
-
 ```
 
-The OWASP dependency check is configured but requires an NVD API key in `local.properties` to run. The build works fine without it — it just skips the vulnerability scan.
+The OWASP dependency check is set up, but it needs an NVD API key in `local.properties` to run. The build works without it and skips the scan.
 
 ```
 # local.properties (not committed)
 nvd.api.key=your_key_here
-
 ```
 
 ---
 
-## What it doesn't do
+## Limitations
 
-* Upload from receiver to phone — one direction only
-* Cross-internet sharing — local network only
-* Persistent file registry — stopping the server clears everything, intentionally
-* iOS sender — Android only on the sending side, any browser on the receiving side
+- One direction only. The receiver can't upload to the phone.
+- Local network only, not over the internet.
+- The file list is kept in memory. Stopping the server keeps it, but closing the app or Android ending the app's process clears it.
+- Android sends, any browser receives. There is no iOS sender.
+- Browsers can't play every video format. Use Copy link and a media player for those.
+- On Android 15 and newer, Android's background time limit applies (see above).
 
 ---
 
