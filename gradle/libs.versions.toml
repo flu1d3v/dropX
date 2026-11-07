@@ -9,7 +9,7 @@ owasp-dependencycheck = "12.2.2"
 ktor = "3.6.1"
 documentfile = "1.1.0"
 zxing = "3.5.4"
-cyclonedx = "3.2.4"
+cyclonedx = "3.5.1"
 
 [libraries]
 # Android Core & Jetpack Compose UI dependencies
